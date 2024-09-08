@@ -5,6 +5,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "gl-matrix": "^3.4.3",
     "simplex-noise": "^4.0.3",
     "three": "^0.168.0",
     "tiff": "^6.1.0"
