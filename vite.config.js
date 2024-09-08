@@ -1,3 +1,7 @@
+import glsl from "vite-plugin-glsl";
+
 export default {
-    base: '/visual-demo/'
-  }
+  plugins: [glsl()],
+  base: "/visual-demo/",
+  assetsInclude: ['**/*.tiff'],
+};
