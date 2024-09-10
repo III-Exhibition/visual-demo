@@ -1,33 +1,39 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { mat4, vec3 } from 'gl-matrix';
 
 // 创建场景
 const scene = new THREE.Scene();
 
-// 创建相机
+// 创建相机，初始距离适中，让球体充满屏幕
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.z = 100;
+camera.position.z = 25;  // 将相机距离设置为 25 以便球体充满屏幕
 
 // 创建渲染器
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// 添加坐标轴辅助 (AxesHelper)
-const axesHelper = new THREE.AxesHelper(50);
+// 添加坐标轴辅助 (AxesHelper)，长度设置为 10 与球体半径相匹配
+const axesHelper = new THREE.AxesHelper(10);
 scene.add(axesHelper);
 
 // 创建 BufferGeometry 来存储粒子数据
-const particles = 100000;  // 粒子数量
+const particles = 1000000;  // 粒子数量
 const geometry = new THREE.BufferGeometry();
 
-// 创建一个 Float32Array 来存储每个粒子的坐标
+// 创建两个数组来存储粒子坐标和颜色
 const positions = new Float32Array(particles * 3);
+const colors = new Float32Array(particles * 3);  // 用于存储每个粒子的颜色
+const alphas = new Float32Array(particles);      // 用于存储每个粒子的透明度
 
-// 将粒子均匀分布在球体上
-const radius = 50;  // 球体半径
+// 随机分布在球体内的点
+const radius = 10;  // 球体半径设为 10
 
+// 初始化 colorMin 和 colorMax 为极端值，只计算 functionY < 0.1 的粒子
+let colorMin = Infinity;
+let colorMax = -Infinity;
+
+// 遍历所有粒子，首先计算 functionY 小于 0.1 的粒子的 colorMin 和 colorMax
 for (let i = 0; i < particles; i++) {
   // 生成均匀分布的球体半径（使用立方根来均匀填充球体）
   const r = radius * Math.cbrt(Math.random());
@@ -44,15 +50,63 @@ for (let i = 0; i < particles; i++) {
   positions[i * 3] = x;
   positions[i * 3 + 1] = y;
   positions[i * 3 + 2] = z;
+
+  // 根据公式 Y = 0.2126 X + 0.7152 Y + 0.0722 Z 计算函数值
+  const functionY = 0.2126 * x + 0.7152 * y + 0.0722 * z;
+
+  // 如果 functionY 小于 0.1，更新 colorMin 和 colorMax
+  if (Math.abs(functionY) < 0.1) {
+    if (functionY < colorMin) colorMin = functionY;
+    if (functionY > colorMax) colorMax = functionY;
+  }
+}
+
+// 第二遍遍历所有粒子，设置透明度并归一化颜色
+for (let i = 0; i < particles; i++) {
+  const x = positions[i * 3];
+  const y = positions[i * 3 + 1];
+  const z = positions[i * 3 + 2];
+
+  const functionY = 0.2126 * x + 0.7152 * y + 0.0722 * z;
+
+  // 设置透明度：当 Y 值大于或等于 0.1 时，透明度为 0，否则为 1
+  alphas[i] = Math.abs(functionY) < 0.1 ? 1.0 : 0.0;
+
+  // 归一化颜色，只对 Y < 0.1 的粒子进行归一化
+  if (Math.abs(functionY) < 0.1) {
+    const normalizedValue = (functionY - colorMin) / (colorMax - colorMin);
+    const color = new THREE.Color();
+    color.setHSL(normalizedValue * 0.7, 1.0, 0.5);  // HSL 色彩空间，H 范围为 0 到 0.7（蓝到红）
+
+    colors[i * 3] = color.r;  // 红色通道
+    colors[i * 3 + 1] = color.g;  // 绿色通道
+    colors[i * 3 + 2] = color.b;  // 蓝色通道
+  } else {
+    // 如果 Y >= 0.1，设为透明粒子
+    colors[i * 3] = 0;
+    colors[i * 3 + 1] = 0;
+    colors[i * 3 + 2] = 0;
+  }
 }
 
 // 将粒子位置设置到 BufferGeometry 中
 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-// 创建粒子材质
+// 将颜色数据添加到几何体中
+geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+// 创建每个粒子的透明度属性
+geometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+
+// 创建粒子材质，启用顶点颜色和透明度
 const material = new THREE.PointsMaterial({
-  color: 0xFFFFFF,
   size: 0.05,
+  vertexColors: true,  // 使用顶点颜色
+  transparent: true,   // 启用透明度
+  opacity: 1.0,
+  alphaTest: 0.001,    // 使用 alphaTest 过滤透明度为 0 的点
+  depthWrite: false,   // 禁止深度写入，以便透明物体正确显示
+  blending: THREE.AdditiveBlending, // 使用叠加混合，使粒子更具有发光效果
 });
 
 // 使用 Points 对象来渲染粒子系统
@@ -66,66 +120,16 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;  // 添加阻尼感
 controls.dampingFactor = 0.25;
 controls.screenSpacePanning = false;
-controls.maxDistance = 500;
-controls.minDistance = 50;
-
-// 初始化变换矩阵
-const rotationMatrix = mat4.create();
-const degToRad = Math.PI / 180;  // 度数转换为弧度
-
-// 计算亮度的函数
-function computeLuminance(r, g, b) {
-  return 0.2126 * Math.abs(r) + 0.7152 * Math.abs(g) + 0.0722 * Math.abs(b);
-}
-
-// 对每个粒子应用旋转变换，使用亮度作为权重
-function rotateParticles() {
-  for (let i = 0; i < particles; i++) {
-    const point = vec3.fromValues(
-      positions[i * 3],
-      positions[i * 3 + 1],
-      positions[i * 3 + 2]
-    );
-
-    // 根据位置坐标 (X, Y, Z) 计算模拟的 RGB 值
-    const r = (point[0] / radius + 1) / 2;  // 归一化到 [0, 1]
-    const g = (point[1] / radius + 1) / 2;
-    const b = (point[2] / radius + 1) / 2;
-
-    // 计算亮度值
-    const luminance = computeLuminance(r, g, b);
-
-    // 初始化旋转矩阵
-    mat4.identity(rotationMatrix);
-
-    // 旋转 3 度绕 X 轴, 4 度绕 Y 轴, 5 度绕 Z 轴
-    mat4.rotateX(rotationMatrix, rotationMatrix, 6 * degToRad);
-    mat4.rotateY(rotationMatrix, rotationMatrix, 6 * degToRad);
-    mat4.rotateZ(rotationMatrix, rotationMatrix, 6 * degToRad);
-
-    // 应用旋转矩阵，同时根据亮度值 (作为权重) 混合原始位置和旋转后的位置
-    const originalPoint = vec3.clone(point);
-    vec3.transformMat4(point, point, rotationMatrix);
-
-    // 插值计算最终位置 (按亮度值控制变换强度)
-    vec3.lerp(point, originalPoint, point, luminance);
-
-    // 更新粒子的位置
-    positions[i * 3] = point[0];
-    positions[i * 3 + 1] = point[1];
-    positions[i * 3 + 2] = point[2];
-  }
-
-  // 更新 BufferGeometry 中的位置数据
-  geometry.attributes.position.needsUpdate = true;
-}
+controls.maxDistance = 50;  // 限制最大缩放距离
+controls.minDistance = 10;  // 限制最小缩放距离
 
 // 动画循环
 function animate() {
   requestAnimationFrame(animate);
 
-  // 每次渲染时对粒子进行旋转
-  rotateParticles();
+  // 为了增加动态效果，可以在这里添加粒子的旋转或移动
+  // particleSystem.rotation.x += 0.001;
+  // particleSystem.rotation.y += 0.001;
 
   // 更新控制器
   controls.update();
