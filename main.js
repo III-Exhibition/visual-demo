@@ -55,7 +55,7 @@ function getColorByPosition(x, y, z) {
 }
 
 // 初始化点云并生成球面上的粒子
-const numPoints = 100000; // 10 万个点
+const numPoints = 1000000; // 10 万个点
 const size = 4; // 球的直径为 4，半径为 2
 const radius = size / 2; // 球的半径
 
@@ -80,7 +80,7 @@ geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
 // 粒子的材质，启用顶点颜色
-const material = new THREE.PointsMaterial({ size: 0.01, vertexColors: true });
+const material = new THREE.PointsMaterial({ size: 0.001, vertexColors: true });
 const points = new THREE.Points(geometry, material);
 
 // 将点云添加到场景中
