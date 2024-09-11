@@ -3,7 +3,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry'
 import Stats from 'three/examples/jsm/libs/stats.module.js';
-import { mat4, vec3 } from 'gl-matrix';  // 引入 gl-matrix 库
+// 引入 gl-matrix 库
+import { mat4, vec3 } from 'gl-matrix';  
+// 引入 noise.js 并创建噪声实例
+import { Noise } from 'noisejs';
+const noise = new Noise(Math.random()); // 使用随机种子初始化
 
 // 创建场景
 const scene = new THREE.Scene();
@@ -55,7 +59,7 @@ function getColorByPosition(x, y, z) {
   }
 }
 
-// 初始化点云并生成球面上的粒子
+// 初始化顶点缓冲区和权重缓冲区
 const numPoints = 200000; // 10 万个点
 const size = 2; // 球的直径为 4，半径为 2
 const radius = size / 2; // 球的半径
@@ -63,25 +67,29 @@ const radius = size / 2; // 球的半径
 const geometry = new THREE.BufferGeometry();
 const vertices = [];
 const colors = [];
+const weightBuffer = []; // 用于存储权重缓冲区
 
 // 生成球面上的粒子并为每个粒子赋予不同的颜色
 for (let i = 0; i < numPoints; i++) {
   const [x, y, z] = getRandomPositionOnSphere(radius);
   vertices.push(x, y, z);
+  weightBuffer.push(x, y, z); // 当前阶段，权重缓冲区内容和顶点缓冲区相同
 
   // 根据位置获取颜色
   const color = getColorByPosition(x, y, z);
   colors.push(...color);
 }
 
-// 将顶点添加到 BufferGeometry 中
+// 将顶点和颜色添加到 BufferGeometry 中
 geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-
-// 将颜色属性添加到几何体中
 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
+// 将权重缓冲区添加到几何体中
+const weightAttribute = new THREE.Float32BufferAttribute(weightBuffer, 3);
+geometry.setAttribute('weight', weightAttribute); // 添加权重属性
+
 // 粒子的材质，启用顶点颜色
-const material = new THREE.PointsMaterial({ size: 0.001, vertexColors: true });
+const material = new THREE.PointsMaterial({ size: 0.01, vertexColors: true });
 const points = new THREE.Points(geometry, material);
 
 // 将点云添加到场景中
@@ -159,23 +167,22 @@ fontLoader.load('node_modules/three/examples/fonts/helvetiker_regular.typeface.j
   scene.add(zTextMesh);
 });
 
-// 创建一个矩阵来处理旋转
-const rotationMatrix = mat4.create();
-
 // 定义权重计算函数，接受粒子的位置（X, Y, Z）
 function calculateWeight(x, y, z) {
   return 0.299 * x + 0.587 * y + 0.114 * z;
 }
 
-// 使用线性插值并为每个点计算权重
-function applyRotationWithLerp(vertices, matrix) {
+// 修改 applyRotationWithLerp 函数，使其继续使用 calculateWeight 函数计算权重
+function applyRotationWithLerp(vertices, weights, matrix) {
   const rotatedVertex = vec3.create();
-  const lerpedVertex = vec3.create(); // 用于存储插值后的结果
+  const lerpedVertex = vec3.create();
 
   for (let i = 0; i < vertices.length; i += 3) {
-    // 获取当前顶点位置并计算权重
+    // 获取当前顶点和权重缓冲区的坐标
     const vertex = vec3.fromValues(vertices[i], vertices[i + 1], vertices[i + 2]);
-    const weight = calculateWeight(vertex[0], vertex[1], vertex[2]);
+
+    // 虽然每一组权重的三个值相同，但仍然使用 calculateWeight 函数
+    const weight = calculateWeight(weights[i], weights[i + 1], weights[i + 2]);
 
     // 应用旋转矩阵，计算旋转后的顶点位置
     vec3.transformMat4(rotatedVertex, vertex, matrix);
@@ -187,6 +194,15 @@ function applyRotationWithLerp(vertices, matrix) {
     vertices[i] = lerpedVertex[0];
     vertices[i + 1] = lerpedVertex[1];
     vertices[i + 2] = lerpedVertex[2];
+  }
+}
+
+// 每次渲染后更新权重缓冲区
+function updateWeightBuffer(vertices, weights) {
+  for (let i = 0; i < vertices.length; i += 3) {
+    // 使用新的粒子坐标生成 Perlin 噪声
+    const perlinValue = noise.perlin3(vertices[i], vertices[i + 1], vertices[i + 2]);
+    weights[i] = weights[i + 1] = weights[i + 2] = perlinValue; // 更新每个权重缓冲区
   }
 }
 
@@ -228,9 +244,15 @@ function animate(currentTime) {
     // 生成旋转矩阵
     const rotationMatrix = generateRotationMatrix();
 
-    // 应用旋转并为每个粒子计算权重
+    // 更新粒子的旋转并根据权重缓冲区计算权重
     const verticesArray = geometry.attributes.position.array;
-    applyRotationWithLerp(verticesArray, rotationMatrix);
+    const weightsArray = geometry.attributes.weight.array; // 获取权重缓冲区数据
+    applyRotationWithLerp(verticesArray, weightsArray, rotationMatrix);
+
+    // 更新权重缓冲区，使其内容等于当前粒子的位置
+    updateWeightBuffer(verticesArray, weightsArray);
+
+    geometry.attributes.position.needsUpdate = true;
     geometry.attributes.position.needsUpdate = true;
   }
 
