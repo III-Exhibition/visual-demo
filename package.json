@@ -2,7 +2,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "buildCf": "vite build --mode cf"
   },
   "dependencies": {
     "gl-matrix": "^3.4.3",

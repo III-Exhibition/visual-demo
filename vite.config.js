@@ -1,7 +1,12 @@
-import glsl from "vite-plugin-glsl";
+import { defineConfig } from "vite";
 
-export default {
-  plugins: [glsl()],
-  base: "/visual-demo/",
-  assetsInclude: ['**/*.tiff'],
-};
+export default defineConfig(({ mode}) => {
+  if (mode === "cf") {
+    return {
+    };
+  } else {
+    return {
+      base: "/visual-demo/",
+    };
+  }
+});
