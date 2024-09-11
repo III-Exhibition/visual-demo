@@ -73,7 +73,6 @@ const weightBuffer = []; // 用于存储权重缓冲区
 for (let i = 0; i < numPoints; i++) {
   const [x, y, z] = getRandomPositionOnSphere(radius);
   vertices.push(x, y, z);
-  weightBuffer.push(x, y, z); // 当前阶段，权重缓冲区内容和顶点缓冲区相同
 
   // 根据位置获取颜色
   const color = getColorByPosition(x, y, z);
@@ -94,6 +93,24 @@ const points = new THREE.Points(geometry, material);
 
 // 将点云添加到场景中
 scene.add(points);
+
+// 初始化权重缓冲区的独立函数
+function initializeWeightBuffer(vertices) {
+  const weightBuffer = [];
+
+  // 使用 Simplex 噪声生成权重
+  for (let i = 0; i < vertices.length; i += 3) {
+    const simplexValue = noise.simplex3(vertices[i], vertices[i + 1], vertices[i + 2]); // 生成 3D Simplex 噪声
+    weightBuffer.push(simplexValue, simplexValue, simplexValue); // 三个维度相同
+  }
+
+  // 将权重缓冲区添加到几何体中
+  const weightAttribute = new THREE.Float32BufferAttribute(weightBuffer, 3);
+  geometry.setAttribute('weight', weightAttribute);
+}
+
+// 在初次渲染前调用生成权重函数
+initializeWeightBuffer(geometry.attributes.position.array);
 
 
 
@@ -172,7 +189,7 @@ function calculateWeight(x, y, z) {
   return 0.299 * x + 0.587 * y + 0.114 * z;
 }
 
-// 修改 applyRotationWithLerp 函数，使其继续使用 calculateWeight 函数计算权重
+// 修改 applyRotationWithLerp 函数，使其根据权重缓冲区数据计算权重
 function applyRotationWithLerp(vertices, weights, matrix) {
   const rotatedVertex = vec3.create();
   const lerpedVertex = vec3.create();
@@ -200,9 +217,9 @@ function applyRotationWithLerp(vertices, weights, matrix) {
 // 每次渲染后更新权重缓冲区
 function updateWeightBuffer(vertices, weights) {
   for (let i = 0; i < vertices.length; i += 3) {
-    // 使用新的粒子坐标生成 Perlin 噪声
-    const perlinValue = noise.perlin3(vertices[i], vertices[i + 1], vertices[i + 2]);
-    weights[i] = weights[i + 1] = weights[i + 2] = perlinValue; // 更新每个权重缓冲区
+    // 使用新的粒子坐标生成 Simplex 噪声
+    const simplexValue = noise.simplex3(vertices[i], vertices[i + 1], vertices[i + 2]);
+    weights[i] = weights[i + 1] = weights[i + 2] = simplexValue; // 更新每个权重缓冲区
   }
 }
 
