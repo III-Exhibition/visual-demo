@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
-import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry'
+import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { mat4, vec3 } from 'gl-matrix';  // 引入 gl-matrix 库
 
 // 创建场景
@@ -55,8 +56,8 @@ function getColorByPosition(x, y, z) {
 }
 
 // 初始化点云并生成球面上的粒子
-const numPoints = 1000000; // 10 万个点
-const size = 4; // 球的直径为 4，半径为 2
+const numPoints = 200000; // 10 万个点
+const size = 2; // 球的直径为 4，半径为 2
 const radius = size / 2; // 球的半径
 
 const geometry = new THREE.BufferGeometry();
@@ -189,7 +190,27 @@ function applyRotationWithLerp(vertices, matrix) {
   }
 }
 
+// 创建旋转矩阵生成函数
+function generateRotationMatrix() {
+  const rotationMatrix = mat4.create();
+  
+  // 将角度从度转换为弧度
+  const angleX = 3 * Math.PI / 180;  // 绕 X 轴 -3.52 度
+  const angleY = 3 * Math.PI / 180;  // 绕 Y 轴 -6.12 度
+  const angleZ = 3 * Math.PI / 180;  // 绕 Z 轴 23.03 度
+
+  // 生成旋转矩阵，先绕 Z 轴，再绕 Y 轴，最后绕 X 轴
+  mat4.rotateZ(rotationMatrix, rotationMatrix, angleZ);
+  mat4.rotateY(rotationMatrix, rotationMatrix, angleY);
+  mat4.rotateX(rotationMatrix, rotationMatrix, angleX);
+  
+  return rotationMatrix;
+}
+
+
 // 动画循环
+const stats = new Stats();
+document.body.appendChild(stats.dom)
 let lastRotationTime = 0;
 function animate(currentTime) {
   requestAnimationFrame(animate);
@@ -201,26 +222,21 @@ function animate(currentTime) {
   const deltaTime = (currentTime - lastRotationTime) / 1000;
 
   // 仅在每 0.5 秒时更新一次粒子旋转
-  if (deltaTime > 0.1) {
+  if (deltaTime > 0.01) {
     lastRotationTime = currentTime;
 
-    // 每次渲染时生成一个随机的旋转权重，范围从 -2 到 2
-    const rotationWeight = - 0.1; // 生成的旋转权重在 -1.5 到 1.5 之间
+    // 生成旋转矩阵
+    const rotationMatrix = generateRotationMatrix();
 
-    // 基于随机权重的旋转角度，单位为弧度
-    const rotationAngle = Math.PI / 25; // 每次旋转的角度，固定为 30 度
-
-    // 使用 fromXRotation 直接创建旋转矩阵
-    mat4.fromXRotation(rotationMatrix, rotationAngle);
-
-    // 应用旋转并进行线性插值
+    // 应用旋转并为每个粒子计算权重
     const verticesArray = geometry.attributes.position.array;
-    applyRotationWithLerp(verticesArray, rotationMatrix, rotationWeight);
+    applyRotationWithLerp(verticesArray, rotationMatrix);
     geometry.attributes.position.needsUpdate = true;
   }
 
   // 渲染场景
   renderer.render(scene, camera);
+  stats.update();
 }
 
 animate();
