@@ -7,7 +7,7 @@ import Stats from "three/examples/jsm/libs/stats.module.js";
 import { mat4, vec3 } from "gl-matrix";
 // 引入 noise.js 并创建噪声实例
 import { Noise } from "noisejs";
-const noise = new Noise(97); // 使用随机种子初始化
+const noise = new Noise(Math.random()); // 使用随机种子初始化
 
 // 创建场景
 const scene = new THREE.Scene();
@@ -19,7 +19,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.z = 10;
+camera.position.z = 2;
 
 // 创建渲染器
 const renderer = new THREE.WebGLRenderer();
@@ -76,7 +76,7 @@ const colors = [];
 // 生成球面上的粒子并为每个粒子赋予不同的颜色
 for (let i = 0; i < numPoints; i++) {
   const [x, y, z] = getRandomPositionOnSphere(radius);
-  vertices.push(x, y, z);
+  vertices.push(x, y, z, 0); // 新增 W 值，初始化为 0
 
   // 根据位置获取颜色
   const color = getColorByPosition(x, y, z);
@@ -86,9 +86,12 @@ for (let i = 0; i < numPoints; i++) {
 // 将顶点和颜色添加到 BufferGeometry 中
 geometry.setAttribute(
   "position",
-  new THREE.Float32BufferAttribute(vertices, 3)
+  new THREE.Float32BufferAttribute(vertices, 4)
 );
 geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+
+// 创建一个背景缓冲区的拷贝，用于 "over" 操作
+const backgroundVertices = [...vertices];
 
 // 粒子的材质，启用顶点颜色
 const material = new THREE.PointsMaterial({ size: 0.01, vertexColors: true });
@@ -179,20 +182,20 @@ function calculateWeight(x, y, z) {
 
 // 初始化权重缓冲区的独立函数
 function initializeWeightBuffer(vertices) {
-  const weightBuffer = [];
+  const weightBuffer = [...vertices];
 
   // 使用 Perlin 噪声生成权重
-  for (let i = 0; i < vertices.length; i += 3) {
-    const perlinValue = noise.perlin3(
-      vertices[i],
-      vertices[i + 1],
-      vertices[i + 2]
-    ); // 生成 3D Perlin 噪声
-    weightBuffer.push(perlinValue, perlinValue, perlinValue); // 三个维度相同
-  }
+  // for (let i = 0; i < vertices.length; i += 3) {
+  //   const perlinValue = noise.perlin3(
+  //     vertices[i],
+  //     vertices[i + 1],
+  //     vertices[i + 2]
+  //   ); // 生成 3D Perlin 噪声
+  //   weightBuffer.push(perlinValue, perlinValue, perlinValue, 0); // 三个维度相同
+  // }
 
   // 将权重缓冲区添加到几何体中
-  const weightAttribute = new THREE.Float32BufferAttribute(weightBuffer, 3);
+  const weightAttribute = new THREE.Float32BufferAttribute(weightBuffer, 4);
   geometry.setAttribute("weight", weightAttribute);
 }
 
@@ -200,7 +203,7 @@ function initializeWeightBuffer(vertices) {
 function updateWeightBuffer(vertices, weights, transformMatrix) {
   const transformedVertex = vec3.create();
 
-  for (let i = 0; i < vertices.length; i += 3) {
+  for (let i = 0; i < vertices.length; i += 4) {
     // 获取顶点坐标
     const vertex = vec3.fromValues(
       vertices[i],
@@ -231,7 +234,7 @@ function applyRotationWithLerp(vertices, weights, matrix) {
   const rotatedVertex = vec3.create();
   const lerpedVertex = vec3.create();
 
-  for (let i = 0; i < vertices.length; i += 3) {
+  for (let i = 0; i < vertices.length; i += 4) {
     // 获取当前顶点和权重缓冲区的坐标
     const vertex = vec3.fromValues(
       vertices[i],
@@ -257,11 +260,26 @@ function applyRotationWithLerp(vertices, weights, matrix) {
 
 // changeOpacity 函数
 function changeOpacity(vertices, factor) {
-  for (let i = 0; i < vertices.length; i += 3) {
-    // 每个顶点的 x, y, z 坐标都乘以传入的数字 factor
+  for (let i = 0; i < vertices.length; i += 4) {
+    // 每个顶点的 x, y, z, w 坐标都乘以传入的数字 factor
     vertices[i] *= factor;      // x 坐标
     vertices[i + 1] *= factor;  // y 坐标
     vertices[i + 2] *= factor;  // z 坐标
+    vertices[i + 3] *= factor;  // w 坐标
+  }
+}
+
+// 修改 applyOver 函数，进行缓冲区的 "over" 操作
+function applyOver(foreground, background) {
+  for (let i = 0; i < foreground.length; i += 4) {
+    const fgR = foreground[i], fgG = foreground[i + 1], fgB = foreground[i + 2], fgA = foreground[i + 3];
+    const bgR = background[i], bgG = background[i + 1], bgB = background[i + 2], bgA = 1; // 背景的 A 始终为 1
+
+    // Over 公式: 结果颜色 = 前景颜色 * 前景透明度 + 背景颜色 * (1 - 前景透明度)
+    foreground[i] = fgR * fgA + bgR * (1 - fgA);
+    foreground[i + 1] = fgG * fgA + bgG * (1 - fgA);
+    foreground[i + 2] = fgB * fgA + bgB * (1 - fgA);
+    foreground[i + 3] = 1; // 保持 A 通道为 1
   }
 }
 
@@ -270,9 +288,9 @@ function generateRotationMatrix() {
   const rotationMatrix = mat4.create();
 
   // 将角度从度转换为弧度
-  const angleX = (3 * Math.PI) / 180; // 绕 X 轴 -3.52 度
-  const angleY = (3 * Math.PI) / 180; // 绕 Y 轴 -6.12 度
-  const angleZ = (3 * Math.PI) / 180; // 绕 Z 轴 23.03 度
+  const angleX = (10 * Math.random() * Math.PI) / 180; // 绕 X 轴 -3.52 度
+  const angleY = (10 * Math.random() * Math.PI) / 180; // 绕 Y 轴 -6.12 度
+  const angleZ = (10 * Math.random() * Math.PI) / 180; // 绕 Z 轴 23.03 度
 
   // 生成旋转矩阵，先绕 Z 轴，再绕 Y 轴，最后绕 X 轴
   mat4.rotateZ(rotationMatrix, rotationMatrix, angleZ);
@@ -318,11 +336,19 @@ function animate(currentTime) {
     const weightsArray = geometry.attributes.weight.array;
 
     // 更新权重缓冲区，应用缩放矩阵
-    updateWeightBuffer(verticesArray, weightsArray, scaleMatrix);
+    // updateWeightBuffer(verticesArray, weightsArray, scaleMatrix);
 
     // 更新粒子的旋转并根据权重缓冲区计算权重
     applyRotationWithLerp(verticesArray, weightsArray, rotationMatrix);
-    changeOpacity(verticesArray, 0.99); // 每帧都减小透明度
+
+    // 对背景缓冲区进行旋转
+    // rotateBackground(backgroundVertices);
+
+    // 应用 "over" 操作，将当前顶点缓冲区与背景缓冲区进行重叠计算
+    // applyOver(verticesArray, backgroundVertices);
+
+    // 每帧都调用 changeOpacity 函数，逐渐把粒子向原点聚拢
+    // changeOpacity(verticesArray, 0.99); 
 
     geometry.attributes.position.needsUpdate = true;
     geometry.attributes.position.needsUpdate = true;
@@ -342,3 +368,41 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+
+// 背景旋转函数
+function rotateBackground(vertices) {
+  const rotationMatrix = generateBackgroundRotationMatrix();
+  const rotatedVertex = vec3.create();
+
+  for (let i = 0; i < vertices.length; i += 4) {
+    const vertex = vec3.fromValues(vertices[i], vertices[i + 1], vertices[i + 2]);
+
+    // 应用旋转矩阵
+    vec3.transformMat4(rotatedVertex, vertex, rotationMatrix);
+
+    // 更新背景顶点位置
+    vertices[i] = rotatedVertex[0];
+    vertices[i + 1] = rotatedVertex[1];
+    vertices[i + 2] = rotatedVertex[2];
+    // W 值保持不变
+  }
+}
+
+
+// 生成背景图像旋转矩阵，旋转 x, y, z 轴各 3 度
+function generateBackgroundRotationMatrix() {
+  const rotationMatrix = mat4.create();
+
+  // 将角度从度转换为弧度
+  const angleX = (3 * Math.PI) / 180; // 绕 X 轴 3 度
+  const angleY = (3 * Math.PI) / 180; // 绕 Y 轴 3 度
+  const angleZ = (3 * Math.PI) / 180; // 绕 Z 轴 3 度
+
+  // 生成旋转矩阵，先绕 Z 轴，再绕 Y 轴，最后绕 X 轴
+  mat4.rotateZ(rotationMatrix, rotationMatrix, angleZ);
+  mat4.rotateY(rotationMatrix, rotationMatrix, angleY);
+  mat4.rotateX(rotationMatrix, rotationMatrix, angleX);
+
+  return rotationMatrix;
+}
