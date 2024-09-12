@@ -9,8 +9,19 @@ const noise3D = createNoise3D();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
+renderer.setClearColor( 0x000000, 0 );
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+
+// 设置画布的背景为渐变色
+renderer.domElement.style.background = `linear-gradient(
+    to bottom,
+    rgb(237, 231, 233) 0%,
+    rgb(109, 170, 214) 15%,
+    rgb(103, 100, 120) 65%,
+    rgb(69, 60, 60) 85%,
+    rgb(20, 20, 20) 100%
+)`;
 
 // 创建粒子数量
 const particleCount = 200000;
@@ -54,10 +65,10 @@ for (let i = 0; i < particleCount; i++) {
 // 设置几何体的位置
 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-// 创建粒子的材质
+// 更新材质使其支持顶点颜色
 const material = new THREE.PointsMaterial({
-    color: 0xffffff,  // 粒子的颜色
-    size: 0.1,        // 粒子的大小
+    vertexColors: true,  // 启用顶点颜色
+    size: 0.1,
     transparent: true,
     opacity: 0.7,
     depthWrite: false,
@@ -107,7 +118,34 @@ function constrainToIrregularShape(positions, velocities, baseRadius) {
     }
 }
 
-// 渲染循环
+// 在渲染循环的开头创建颜色渐变数组
+const colors = new Float32Array(particleCount * 3);
+
+// 创建用于颜色渐变的色板
+const colorStops = [
+    new THREE.Color(0xEDE7E9),  // 到球心最近的颜色
+    new THREE.Color(0xEA3B4D),
+    new THREE.Color(0xFB7C39),
+    new THREE.Color(0xC4DED0),
+    new THREE.Color(0xE4C2CA),  // 到球心最远的颜色
+];
+
+// 函数：根据距离映射颜色
+function mapDistanceToColor(distance, maxDistance) {
+    const ratio = distance / maxDistance;
+    const numStops = colorStops.length;
+    const scaledRatio = ratio * (numStops - 1);
+    const lowerIndex = Math.floor(scaledRatio);
+    const upperIndex = Math.min(lowerIndex + 1, numStops - 1);
+    const blendFactor = scaledRatio - lowerIndex;
+
+    const color = new THREE.Color();
+    color.lerpColors(colorStops[lowerIndex], colorStops[upperIndex], blendFactor);
+    return color;
+}
+
+
+// 在 animate 函数中更新粒子的颜色
 function animate() {
     requestAnimationFrame(animate);
 
@@ -116,12 +154,24 @@ function animate() {
     // 动态更新粒子的运动范围
     updateDynamicRadius();
 
-    // 更新每个粒子的位置，模拟扭曲和烟雾效果
+    // 更新每个粒子的位置和颜色，模拟扭曲和烟雾效果
     const positionsArray = geometry.attributes.position.array;
+    const maxDistance = baseRadius + 10; // 动态范围最大值，用于颜色映射
     for (let i = 0; i < particleCount; i++) {
         const x = positionsArray[i * 3];
         const y = positionsArray[i * 3 + 1];
         const z = positionsArray[i * 3 + 2];
+
+        // 计算到球心的距离
+        const distance = Math.sqrt(x * x + y * y + z * z);
+
+        // 映射距离到颜色
+        const color = mapDistanceToColor(distance, maxDistance);
+
+        // 更新颜色数组
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
 
         // Simplex 噪声模拟湍流，结合旋转和扭曲
         const noiseFactor = 2; // 调整噪声影响强度，使其像烟雾
@@ -129,7 +179,7 @@ function animate() {
         const windY = noise3D(y * 0.05, z * 0.05, time) * noiseFactor;
         const windZ = noise3D(z * 0.05, x * 0.05, time) * noiseFactor;
 
-        // 更新粒子的速度，结合噪声、扭曲和旋转
+        // 更新粒子的速度
         velocities[i * 3] += windX * 0.01;
         velocities[i * 3 + 1] += windY * 0.01;
         velocities[i * 3 + 2] += windZ * 0.01;
@@ -145,10 +195,13 @@ function animate() {
 
     geometry.attributes.position.needsUpdate = true; // 告诉渲染器更新位置
 
+    // 更新粒子的颜色
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.attributes.color.needsUpdate = true;
+
     // 粒子整体旋转
     particles.rotation.x += 0.005;
     particles.rotation.y += 0.005;
-    // particles.rotation.x += 0.005;
 
     // 更新控件
     controls.update();
