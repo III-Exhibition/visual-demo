@@ -67,7 +67,7 @@ geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
 
 // 载入五角星形状的纹理
-const starTexture = new THREE.TextureLoader().load('./apple.png'); // 请确保这里的路径指向你的五角星图片
+const starTexture = new THREE.TextureLoader().load('/apple.png'); // 请确保这里的路径指向你的五角星图片
 console.log(starTexture);
 
 // 更新材质使其使用五角星纹理
@@ -200,7 +200,7 @@ function animate() {
 
     // 随机旋转相机
     randomizeCameraRotation();
-    
+
     // 将粒子限制在动态扩散的边界内，且边界不规则
     constrainToIrregularShape(positionsArray, velocities, dynamicRadius);
 
