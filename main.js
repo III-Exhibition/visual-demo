@@ -24,7 +24,7 @@ renderer.domElement.style.background = `linear-gradient(
 )`;
 
 // 创建粒子数量
-const particleCount = 200000;
+const particleCount = 100000;
 const geometry = new THREE.BufferGeometry();
 const positions = new Float32Array(particleCount * 3);
 const velocities = new Float32Array(particleCount * 3); // 粒子的速度
@@ -65,13 +65,19 @@ for (let i = 0; i < particleCount; i++) {
 // 设置几何体的位置
 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-// 更新材质使其支持顶点颜色
+
+// 载入五角星形状的纹理
+const starTexture = new THREE.TextureLoader().load('./apple.png'); // 请确保这里的路径指向你的五角星图片
+console.log(starTexture);
+
+// 更新材质使其使用五角星纹理
 const material = new THREE.PointsMaterial({
-    vertexColors: true,  // 启用顶点颜色
-    size: 0.1,
+    map: starTexture,  // 使用五角星纹理
+    size: 1,         // 调整大小以适应场景
     transparent: true,
-    opacity: 0.7,
+    alphaTest: 0.5,    // 忽略透明度低于0.5的部分
     depthWrite: false,
+    blending: THREE.AdditiveBlending // 使用加成混合效果，使星星看起来更亮
 });
 
 // 创建粒子系统并添加到场景中
@@ -79,7 +85,9 @@ const particles = new THREE.Points(geometry, material);
 scene.add(particles);
 
 // 设置相机位置
-camera.position.z = 150;
+camera.position.z = 0;
+
+
 
 // 添加OrbitControls
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -190,6 +198,9 @@ function animate() {
         positionsArray[i * 3 + 2] += velocities[i * 3 + 2];
     }
 
+    // 随机旋转相机
+    randomizeCameraRotation();
+    
     // 将粒子限制在动态扩散的边界内，且边界不规则
     constrainToIrregularShape(positionsArray, velocities, dynamicRadius);
 
@@ -218,3 +229,12 @@ window.addEventListener('resize', () => {
 
 // 开始动画
 animate();
+
+
+// 新增函数：随机旋转相机
+function randomizeCameraRotation() {
+    const maxRotation = Math.PI / 50; // 限制旋转的角度范围
+    camera.rotation.x += (Math.random() - 0.5) * maxRotation;
+    camera.rotation.y += (Math.random() - 0.5) * maxRotation;
+    camera.rotation.z += (Math.random() - 0.5) * maxRotation;
+}
