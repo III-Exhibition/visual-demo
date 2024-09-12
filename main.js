@@ -1,167 +1,408 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { createNoise3D } from 'simplex-noise'; // 从simplex-noise v4导入createNoise3D
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { FontLoader } from "three/examples/jsm/loaders/FontLoader";
+import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry";
+import Stats from "three/examples/jsm/libs/stats.module.js";
+// 引入 gl-matrix 库
+import { mat4, vec3 } from "gl-matrix";
+// 引入 noise.js 并创建噪声实例
+import { Noise } from "noisejs";
+const noise = new Noise(Math.random()); // 使用随机种子初始化
 
-// 创建 3D 噪声函数
-const noise3D = createNoise3D();
-
-// 创建场景、相机和渲染器
+// 创建场景
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+// 创建摄像机
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.z = 2;
+
+// 创建渲染器
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// 创建粒子数量
-const particleCount = 200000;
-const geometry = new THREE.BufferGeometry();
-const positions = new Float32Array(particleCount * 3);
-const velocities = new Float32Array(particleCount * 3); // 粒子的速度
-const initialPositions = new Float32Array(particleCount * 3);
-
-let time = 0;
-
-// 生成粒子分布在球体内部
-const baseRadius = 70;  // 初始球体半径
-let dynamicRadius = baseRadius; // 用于动态调整的半径
-for (let i = 0; i < particleCount; i++) {
-    const rnd = [Math.random(), Math.random(), Math.random(), Math.random()];
-
-    const twoPi = 2.0 * Math.PI;
-    const theta = twoPi * rnd[0]; // 随机生成 theta
-    const phi = Math.acos(2 * rnd[1] - 1); // 随机生成 phi
-    const third = 1.0 / 3.0;
-    const r = Math.pow(rnd[2], third) * baseRadius; // 确保点均匀分布在体积内
-
-    const x = r * Math.cos(theta) * Math.sin(phi);
-    const y = r * Math.sin(theta) * Math.sin(phi);
-    const z = r * Math.cos(phi);
-
-    initialPositions[i * 3] = x;
-    initialPositions[i * 3 + 1] = y;
-    initialPositions[i * 3 + 2] = z;
-    
-    positions[i * 3] = x;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = z;
-
-    // 初始化粒子的速度为0
-    velocities[i * 3] = 0;
-    velocities[i * 3 + 1] = 0;
-    velocities[i * 3 + 2] = 0;
-}
-
-// 设置几何体的位置
-geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-// 创建粒子的材质
-const material = new THREE.PointsMaterial({
-    color: 0xffffff,  // 粒子的颜色
-    size: 0.1,        // 粒子的大小
-    transparent: true,
-    opacity: 0.7,
-    depthWrite: false,
-});
-
-// 创建粒子系统并添加到场景中
-const particles = new THREE.Points(geometry, material);
-scene.add(particles);
-
-// 设置相机位置
-camera.position.z = 150;
-
-// 添加OrbitControls
+// 添加视角控制
 const controls = new OrbitControls(camera, renderer.domElement);
 
-// 函数：允许边界范围动态变化，并根据噪声进行扩散
-function updateDynamicRadius() {
-    // 动态调整的基础是保持一定范围
-    const expansionFactor = 5; // 控制扩散幅度
-    dynamicRadius = baseRadius + Math.sin(time * 0.5) * expansionFactor; // 基于正弦函数变化
+// 定义球面区域的颜色
+const faceColors = {
+  "+X": [1.0, 0.0, 0.0], // 红色
+  "-X": [0.0, 1.0, 0.0], // 绿色
+  "+Y": [0.0, 0.0, 1.0], // 蓝色
+  "-Y": [1.0, 1.0, 0.0], // 黄色
+  "+Z": [1.0, 0.0, 1.0], // 紫色
+  "-Z": [0.0, 1.0, 1.0], // 青色
+};
+
+// 生成球面上的随机点
+function getRandomPositionOnSphere(radius) {
+  const u = Math.random();
+  const v = Math.random();
+  const theta = 2 * Math.PI * u;
+  const phi = Math.acos(2 * v - 1);
+
+  const x = radius * Math.sin(phi) * Math.cos(theta);
+  const y = radius * Math.sin(phi) * Math.sin(theta);
+  const z = radius * Math.cos(phi);
+
+  return [x, y, z];
 }
 
-// 函数：将粒子限制在不规则的边界内，并让边界受噪声控制
-function constrainToIrregularShape(positions, velocities, baseRadius) {
-    for (let i = 0; i < particleCount; i++) {
-        const x = positions[i * 3];
-        const y = positions[i * 3 + 1];
-        const z = positions[i * 3 + 2];
-        const distance = Math.sqrt(x * x + y * y + z * z);
+// 根据顶点的空间位置确定其所在的区域
+function getColorByPosition(x, y, z) {
+  if (Math.abs(x) >= Math.abs(y) && Math.abs(x) >= Math.abs(z)) {
+    return x >= 0 ? faceColors["+X"] : faceColors["-X"];
+  } else if (Math.abs(y) >= Math.abs(x) && Math.abs(y) >= Math.abs(z)) {
+    return y >= 0 ? faceColors["+Y"] : faceColors["-Y"];
+  } else {
+    return z >= 0 ? faceColors["+Z"] : faceColors["-Z"];
+  }
+}
 
-        // 使用噪声生成不规则的半径边界
-        const noiseFactor = 10; // 控制噪声影响大小
-        const irregularRadius = baseRadius + noise3D(x * 0.05, y * 0.05, time) * noiseFactor;
+// 初始化顶点缓冲区和权重缓冲区
+const numPoints = 200000; // 10 万个点
+const size = 2; // 球的直径为 4，半径为 2
+const radius = size / 2; // 球的半径
 
-        // 如果粒子超出当前不规则半径边界，则将其拉回
-        if (distance > irregularRadius) {
-            const factor = irregularRadius / distance;
-            positions[i * 3] = x * factor;
-            positions[i * 3 + 1] = y * factor;
-            positions[i * 3 + 2] = z * factor;
+const geometry = new THREE.BufferGeometry();
+const vertices = [];
+const colors = [];
 
-            // 减缓速度，避免剧烈移动
-            velocities[i * 3] *= 0.95;
-            velocities[i * 3 + 1] *= 0.95;
-            velocities[i * 3 + 2] *= 0.95;
-        }
+// 生成球面上的粒子并为每个粒子赋予不同的颜色
+for (let i = 0; i < numPoints; i++) {
+  const [x, y, z] = getRandomPositionOnSphere(radius);
+  vertices.push(x, y, z, 0); // 新增 W 值，初始化为 0
+
+  // 根据位置获取颜色
+  const color = getColorByPosition(x, y, z);
+  colors.push(...color);
+}
+
+// 将顶点和颜色添加到 BufferGeometry 中
+geometry.setAttribute(
+  "position",
+  new THREE.Float32BufferAttribute(vertices, 4)
+);
+geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+
+// 创建一个背景缓冲区的拷贝，用于 "over" 操作
+const backgroundVertices = [...vertices];
+
+// 粒子的材质，启用顶点颜色
+const material = new THREE.PointsMaterial({ size: 0.01, vertexColors: true });
+const points = new THREE.Points(geometry, material);
+
+// 将点云添加到场景中
+scene.add(points);
+
+// 添加坐标轴
+const axesHelper = new THREE.AxesHelper(5); // 5 表示坐标轴的长度
+scene.add(axesHelper);
+
+// 添加标尺函数
+function createRuler(axis, length, interval) {
+  const rulerGroup = new THREE.Group();
+  for (let i = -length; i <= length; i += interval) {
+    const markerGeometry = new THREE.BufferGeometry();
+    const markerVertices = [];
+
+    if (axis === "x") {
+      markerVertices.push(i, 0, 0, i, 0.2, 0); // 在 X 轴上创建垂直小线段
+    } else if (axis === "y") {
+      markerVertices.push(0, i, 0, 0.2, i, 0); // 在 Y 轴上创建水平小线段
+    } else if (axis === "z") {
+      markerVertices.push(0, 0, i, 0, 0.2, i); // 在 Z 轴上创建垂直小线段
     }
+
+    markerGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(markerVertices, 3)
+    );
+    const markerMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+    const marker = new THREE.Line(markerGeometry, markerMaterial);
+    rulerGroup.add(marker);
+  }
+  return rulerGroup;
 }
 
-// 渲染循环
-function animate() {
-    requestAnimationFrame(animate);
+// 在 X, Y, Z 轴上添加标尺，长度为 5，间隔为 1
+const xRuler = createRuler("x", 5, 1);
+const yRuler = createRuler("y", 5, 1);
+const zRuler = createRuler("z", 5, 1);
 
-    time += 0.01; // 控制时间因素
+scene.add(xRuler);
+scene.add(yRuler);
+scene.add(zRuler);
 
-    // 动态更新粒子的运动范围
-    updateDynamicRadius();
+// 创建字体加载器
+const fontLoader = new FontLoader();
 
-    // 更新每个粒子的位置，模拟扭曲和烟雾效果
-    const positionsArray = geometry.attributes.position.array;
-    for (let i = 0; i < particleCount; i++) {
-        const x = positionsArray[i * 3];
-        const y = positionsArray[i * 3 + 1];
-        const z = positionsArray[i * 3 + 2];
+// 加载字体文件
+fontLoader.load(
+  "node_modules/three/examples/fonts/helvetiker_regular.typeface.json",
+  function (font) {
+    // 创建 X、Y、Z 的字母标记
+    const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-        // Simplex 噪声模拟湍流，结合旋转和扭曲
-        const noiseFactor = 2; // 调整噪声影响强度，使其像烟雾
-        const windX = noise3D(x * 0.05, y * 0.05, time) * noiseFactor;
-        const windY = noise3D(y * 0.05, z * 0.05, time) * noiseFactor;
-        const windZ = noise3D(z * 0.05, x * 0.05, time) * noiseFactor;
+    const textOptions = {
+      font: font,
+      size: 0.2,
+      depth: 0.01,
+    };
 
-        // 更新粒子的速度，结合噪声、扭曲和旋转
-        velocities[i * 3] += windX * 0.01;
-        velocities[i * 3 + 1] += windY * 0.01;
-        velocities[i * 3 + 2] += windZ * 0.01;
+    // X 轴标记
+    const xTextGeometry = new TextGeometry("X", textOptions);
+    const xTextMesh = new THREE.Mesh(xTextGeometry, textMaterial);
+    xTextMesh.position.set(5.5, 0, 0); // 放置在 X 轴末端
+    scene.add(xTextMesh);
 
-        // 更新粒子的位置
-        positionsArray[i * 3] += velocities[i * 3];
-        positionsArray[i * 3 + 1] += velocities[i * 3 + 1];
-        positionsArray[i * 3 + 2] += velocities[i * 3 + 2];
-    }
+    // Y 轴标记
+    const yTextGeometry = new TextGeometry("Y", textOptions);
+    const yTextMesh = new THREE.Mesh(yTextGeometry, textMaterial);
+    yTextMesh.position.set(0, 5.5, 0); // 放置在 Y 轴末端
+    scene.add(yTextMesh);
 
-    // 将粒子限制在动态扩散的边界内，且边界不规则
-    constrainToIrregularShape(positionsArray, velocities, dynamicRadius);
+    // Z 轴标记
+    const zTextGeometry = new TextGeometry("Z", textOptions);
+    const zTextMesh = new THREE.Mesh(zTextGeometry, textMaterial);
+    zTextMesh.position.set(0, 0, 5.5); // 放置在 Z 轴末端
+    scene.add(zTextMesh);
+  }
+);
 
-    geometry.attributes.position.needsUpdate = true; // 告诉渲染器更新位置
-
-    // 粒子整体旋转
-    particles.rotation.x += 0.005;
-    particles.rotation.y += 0.005;
-    // particles.rotation.x += 0.005;
-
-    // 更新控件
-    controls.update();
-
-    renderer.render(scene, camera);
+// 定义权重计算函数，接受粒子的位置（X, Y, Z）
+function calculateWeight(x, y, z) {
+  return 0.299 * x + 0.587 * y + 0.114 * z;
 }
 
-// 监听窗口大小改变，调整渲染器尺寸
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+// 初始化权重缓冲区的独立函数
+function initializeWeightBuffer(vertices) {
+  const weightBuffer = [...vertices];
+
+  // 使用 Perlin 噪声生成权重
+  // for (let i = 0; i < vertices.length; i += 3) {
+  //   const perlinValue = noise.perlin3(
+  //     vertices[i],
+  //     vertices[i + 1],
+  //     vertices[i + 2]
+  //   ); // 生成 3D Perlin 噪声
+  //   weightBuffer.push(perlinValue, perlinValue, perlinValue, 0); // 三个维度相同
+  // }
+
+  // 将权重缓冲区添加到几何体中
+  const weightAttribute = new THREE.Float32BufferAttribute(weightBuffer, 4);
+  geometry.setAttribute("weight", weightAttribute);
+}
+
+// 更新权重缓冲区函数
+function updateWeightBuffer(vertices, weights, transformMatrix) {
+  const transformedVertex = vec3.create();
+
+  for (let i = 0; i < vertices.length; i += 4) {
+    // 获取顶点坐标
+    const vertex = vec3.fromValues(
+      vertices[i],
+      vertices[i + 1],
+      vertices[i + 2]
+    );
+
+    // 应用变换矩阵，计算变换后的顶点位置
+    vec3.transformMat4(transformedVertex, vertex, transformMatrix);
+
+    // 使用变换后的坐标生成 Perlin 噪声作为权重
+    const perlinValue = noise.perlin3(
+      transformedVertex[0],
+      transformedVertex[1],
+      transformedVertex[2]
+    );
+
+    // 将生成的权重应用到权重缓冲区的三个维度
+    weights[i] = weights[i + 1] = weights[i + 2] = perlinValue;
+  }
+}
+
+// 在初次渲染前调用生成权重函数
+initializeWeightBuffer(geometry.attributes.position.array);
+
+// 修改 applyRotationWithLerp 函数，使其根据权重缓冲区数据计算权重
+function applyRotationWithLerp(vertices, weights, matrix) {
+  const rotatedVertex = vec3.create();
+  const lerpedVertex = vec3.create();
+
+  for (let i = 0; i < vertices.length; i += 4) {
+    // 获取当前顶点和权重缓冲区的坐标
+    const vertex = vec3.fromValues(
+      vertices[i],
+      vertices[i + 1],
+      vertices[i + 2]
+    );
+
+    // 虽然每一组权重的三个值相同，但仍然使用 calculateWeight 函数
+    const weight = calculateWeight(weights[i], weights[i + 1], weights[i + 2]);
+
+    // 应用旋转矩阵，计算旋转后的顶点位置
+    vec3.transformMat4(rotatedVertex, vertex, matrix);
+
+    // 使用 vec3.lerp 进行线性插值
+    vec3.lerp(lerpedVertex, vertex, rotatedVertex, weight);
+
+    // 更新顶点位置
+    vertices[i] = lerpedVertex[0];
+    vertices[i + 1] = lerpedVertex[1];
+    vertices[i + 2] = lerpedVertex[2];
+  }
+}
+
+// changeOpacity 函数
+function changeOpacity(vertices, factor) {
+  for (let i = 0; i < vertices.length; i += 4) {
+    // 每个顶点的 x, y, z, w 坐标都乘以传入的数字 factor
+    vertices[i] *= factor;      // x 坐标
+    vertices[i + 1] *= factor;  // y 坐标
+    vertices[i + 2] *= factor;  // z 坐标
+    vertices[i + 3] *= factor;  // w 坐标
+  }
+}
+
+// 修改 applyOver 函数，进行缓冲区的 "over" 操作
+function applyOver(foreground, background) {
+  for (let i = 0; i < foreground.length; i += 4) {
+    const fgR = foreground[i], fgG = foreground[i + 1], fgB = foreground[i + 2], fgA = foreground[i + 3];
+    const bgR = background[i], bgG = background[i + 1], bgB = background[i + 2], bgA = 1; // 背景的 A 始终为 1
+
+    // Over 公式: 结果颜色 = 前景颜色 * 前景透明度 + 背景颜色 * (1 - 前景透明度)
+    foreground[i] = fgR * fgA + bgR * (1 - fgA);
+    foreground[i + 1] = fgG * fgA + bgG * (1 - fgA);
+    foreground[i + 2] = fgB * fgA + bgB * (1 - fgA);
+    foreground[i + 3] = 1; // 保持 A 通道为 1
+  }
+}
+
+// 创建旋转矩阵生成函数
+function generateRotationMatrix() {
+  const rotationMatrix = mat4.create();
+
+  // 将角度从度转换为弧度
+  const angleX = (10 * Math.random() * Math.PI) / 180; // 绕 X 轴 -3.52 度
+  const angleY = (10 * Math.random() * Math.PI) / 180; // 绕 Y 轴 -6.12 度
+  const angleZ = (10 * Math.random() * Math.PI) / 180; // 绕 Z 轴 23.03 度
+
+  // 生成旋转矩阵，先绕 Z 轴，再绕 Y 轴，最后绕 X 轴
+  mat4.rotateZ(rotationMatrix, rotationMatrix, angleZ);
+  mat4.rotateY(rotationMatrix, rotationMatrix, angleY);
+  mat4.rotateX(rotationMatrix, rotationMatrix, angleX);
+
+  return rotationMatrix;
+}
+
+// 创建缩放矩阵的函数，接收 x、y 和 z 轴的缩放比例作为参数
+function generateScaleMatrix(scaleX, scaleY, scaleZ) {
+  const scaleMatrix = mat4.create();
+  // 缩放 x, y 和 z 轴
+  mat4.scale(scaleMatrix, scaleMatrix, [scaleX, scaleY, scaleZ]);
+  return scaleMatrix;
+}
+
+// 动画循环
+const stats = new Stats();
+document.body.appendChild(stats.dom);
+let lastRotationTime = 0;
+function animate(currentTime) {
+  requestAnimationFrame(animate);
+
+  // 更新视角控制，每帧都更新
+  controls.update();
+
+  // 将当前时间转换为秒
+  const deltaTime = (currentTime - lastRotationTime) / 1000;
+
+  // 仅在每 0.5 秒时更新一次粒子旋转
+  if (deltaTime > 0.01) {
+    lastRotationTime = currentTime;
+
+    // 生成旋转矩阵
+    const rotationMatrix = generateRotationMatrix();
+
+    // 生成缩放矩阵，按需缩放 x, y, z 轴
+    const scaleMatrix = generateScaleMatrix(0.5, 0.5, 0.5); // 同时缩小 x, y, z 轴
+
+    // 获取顶点和权重缓冲区
+    const verticesArray = geometry.attributes.position.array;
+    const weightsArray = geometry.attributes.weight.array;
+
+    // 更新权重缓冲区，应用缩放矩阵
+    // updateWeightBuffer(verticesArray, weightsArray, scaleMatrix);
+
+    // 更新粒子的旋转并根据权重缓冲区计算权重
+    applyRotationWithLerp(verticesArray, weightsArray, rotationMatrix);
+
+    // 对背景缓冲区进行旋转
+    // rotateBackground(backgroundVertices);
+
+    // 应用 "over" 操作，将当前顶点缓冲区与背景缓冲区进行重叠计算
+    // applyOver(verticesArray, backgroundVertices);
+
+    // 每帧都调用 changeOpacity 函数，逐渐把粒子向原点聚拢
+    // changeOpacity(verticesArray, 0.99); 
+
+    geometry.attributes.position.needsUpdate = true;
+    geometry.attributes.position.needsUpdate = true;
+    
+  }
+
+  // 渲染场景
+  renderer.render(scene, camera);
+  stats.update();
+}
+
+animate();
+
+// 窗口大小改变时，调整摄像机和渲染器的尺寸
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// 开始动画
-animate();
+
+// 背景旋转函数
+function rotateBackground(vertices) {
+  const rotationMatrix = generateBackgroundRotationMatrix();
+  const rotatedVertex = vec3.create();
+
+  for (let i = 0; i < vertices.length; i += 4) {
+    const vertex = vec3.fromValues(vertices[i], vertices[i + 1], vertices[i + 2]);
+
+    // 应用旋转矩阵
+    vec3.transformMat4(rotatedVertex, vertex, rotationMatrix);
+
+    // 更新背景顶点位置
+    vertices[i] = rotatedVertex[0];
+    vertices[i + 1] = rotatedVertex[1];
+    vertices[i + 2] = rotatedVertex[2];
+    // W 值保持不变
+  }
+}
+
+
+// 生成背景图像旋转矩阵，旋转 x, y, z 轴各 3 度
+function generateBackgroundRotationMatrix() {
+  const rotationMatrix = mat4.create();
+
+  // 将角度从度转换为弧度
+  const angleX = (3 * Math.PI) / 180; // 绕 X 轴 3 度
+  const angleY = (3 * Math.PI) / 180; // 绕 Y 轴 3 度
+  const angleZ = (3 * Math.PI) / 180; // 绕 Z 轴 3 度
+
+  // 生成旋转矩阵，先绕 Z 轴，再绕 Y 轴，最后绕 X 轴
+  mat4.rotateZ(rotationMatrix, rotationMatrix, angleZ);
+  mat4.rotateY(rotationMatrix, rotationMatrix, angleY);
+  mat4.rotateX(rotationMatrix, rotationMatrix, angleX);
+
+  return rotationMatrix;
+}
