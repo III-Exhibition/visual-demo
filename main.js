@@ -19,7 +19,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.z = 8;
+camera.position.z = 15;
 
 // 创建渲染器
 const renderer = new THREE.WebGLRenderer();
@@ -81,7 +81,7 @@ function getColorByPosition(x, y, z) {
 
 // 初始化顶点缓冲区和权重缓冲区
 const numPoints = 150000; // 10 万个点
-const size = 10; // 球的直径为 4，半径为 2
+const size = 20; // 球的直径为 4，半径为 2
 const radius = size / 2; // 球的半径
 
 const geometry = new THREE.BufferGeometry();
@@ -201,8 +201,11 @@ function initializeWeightBuffer(vertices) {
 
   // 使用 Perlin 噪声生成权重
   for (let i = 0; i < vertices.length; i += 3) {
-    const perlinValue =
-      noise.perlin3(vertices[i], vertices[i + 1], vertices[i + 2]) / 5; // 生成 3D Perlin 噪声
+    const perlinValue = noise.perlin3(
+      vertices[i] / 10,
+      vertices[i + 1] / 10,
+      vertices[i + 2] / 10
+    ); // 生成 3D Perlin 噪声
     weightBuffer.push(perlinValue, perlinValue, perlinValue, 0); // 三个维度相同
   }
 
@@ -228,13 +231,13 @@ function updateWeightBuffer(vertices, weights, transformMatrix) {
 
     // 使用变换后的坐标生成 Perlin 噪声作为权重
     const perlinValue = noise.perlin3(
-      transformedVertex[0],
-      transformedVertex[1],
-      transformedVertex[2]
+      transformedVertex[0] / 10,
+      transformedVertex[1] / 10,
+      transformedVertex[2] / 10
     );
 
     // 将生成的权重应用到权重缓冲区的三个维度
-    weights[i] = weights[i + 1] = weights[i + 2] = perlinValue / 5;
+    weights[i] = weights[i + 1] = weights[i + 2] = perlinValue;
   }
 }
 
