@@ -455,7 +455,6 @@ function flashScreen() {
   }, flashDuration);
 }
 
-let distance = 10; // 摄像机与球心的距离
 let theta = 0; // 方位角
 let phi = Math.PI / 4; // 俯仰角
 
@@ -494,7 +493,7 @@ function animate(currentTime) {
   requestAnimationFrame(animate);
 
   // 在每次渲染时调用摄像机移动函数
-  moveCameraOnSphere(radius, 0.002, 0.002); // 传入角速度
+  moveCameraOnSphere(radius, 0.001, 0.001); // 传入角速度
 
   // 更新视角控制，每帧都更新
   controls.update();
@@ -507,14 +506,14 @@ function animate(currentTime) {
   // 将当前时间转换为秒
   const deltaTime = (currentTime - lastRotationTime) / 1000;
 
-  // 每 5 秒更新一次矩阵
+  // 每 15 秒更新一次矩阵
   if (currentTime - lastMatrixUpdateTime > matrixUpdateInterval) {
     matrices = generateAllTransformations(elapsedTime);
     lastMatrixUpdateTime = currentTime;
   }
 
-  // 仅在每 0.5 秒时更新一次粒子旋转
-  if (deltaTime > 0.005) {
+  // 仅在每 0.01 秒时更新一次粒子旋转
+  if (deltaTime > 0.01) {
     lastRotationTime = currentTime;
 
     const opacityFactor = 0.995; // 每帧逐渐减小粒子的透明度
