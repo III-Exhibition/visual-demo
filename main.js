@@ -19,11 +19,12 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.z = 10;
+camera.position.z = 2;
 
 // 创建渲染器
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x101010, ); // 设置背景颜色为浅灰色
 document.body.appendChild(renderer.domElement);
 
 // 添加视角控制
@@ -80,8 +81,8 @@ function getColorByPosition(x, y, z) {
 }
 
 // 初始化顶点缓冲区和权重缓冲区
-const numPoints = 100000; // 10 万个点
-const size = 20; // 球的直径为 4，半径为 2
+const numPoints = 150000; // 10 万个点
+const size = 2; // 球的直径为 4，半径为 2
 const radius = size / 2; // 球的半径
 
 const geometry = new THREE.BufferGeometry();
@@ -113,6 +114,8 @@ const material = new THREE.PointsMaterial({
   size: 1,
   vertexColors: true,
   sizeAttenuation: false,
+  transparent: true,
+  opacity: 0.8,
 });
 const points = new THREE.Points(geometry, material);
 
@@ -448,11 +451,11 @@ function getRandomInRange(a, b) {
 // 屏幕闪烁函数
 function flashScreen() {
   // 设置闪烁颜色
-  renderer.setClearColor(0xffffff, 1); // 白色闪烁
+  // renderer.setClearColor(0xffffff, 1); // 白色闪烁
 
   // 在指定时间后恢复原始颜色
   setTimeout(() => {
-    renderer.setClearColor(0x000000, 1);
+    // renderer.setClearColor(0x000000, 1);
   }, flashDuration);
 }
 
