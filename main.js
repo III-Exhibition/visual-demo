@@ -238,7 +238,7 @@ function updateWeightBuffer(vertices, weights, transformMatrix) {
       transformedVertex[0] / radius,
       transformedVertex[1] / radius,
       transformedVertex[2] / radius
-    ); // 生成 3D Perlin 噪声并乘以根号 3;
+    ); // 生成 3D Perlin 噪声;
 
     // 将生成的权重应用到权重缓冲区的三个维度
     weights[i] = weights[i + 1] = weights[i + 2] = perlinValue;
@@ -369,14 +369,15 @@ let transformationParams = {};
 
 // 随机生成变换参数并生成矩阵
 function generateAllTransformations(elapsedTime) {
+  noise.seed(Math.random()); // 每次生成新的噪声种子
   // 为 updateWeightBuffer 函数生成变换参数
   transformationParams.weightBuffer = {
     rotation: { x: 0, y: 0, z: 0 },
     scale: { x: 0.5, y: 0.5, z: 0.5 },
     translation: {
-      x: elapsedTime * getRandomInRange(-0.8, 0.8),
+      x: 0,
       y: elapsedTime * getRandomInRange(-0.8, 0.8),
-      z: elapsedTime * getRandomInRange(-0.8, 0.8),
+      z: 0,
     },
   };
 
@@ -398,9 +399,9 @@ function generateAllTransformations(elapsedTime) {
   // 为背景生成变换参数
   transformationParams.background = {
     rotation: {
-      x: getRandomInRange(-2, 2),
-      y: getRandomInRange(-2, 2),
-      z: getRandomInRange(-2, 2),
+      x: getRandomInRange(-1, 1),
+      y: getRandomInRange(-1, 1),
+      z: getRandomInRange(-1, 1),
     },
     scale: {
       x: 1,
@@ -482,7 +483,7 @@ let startTime = null;
 let flashDuration = 100; // 闪烁的持续时间（以毫秒为单位）
 let matrices = generateAllTransformations(0);
 let lastMatrixUpdateTime = 0;
-const matrixUpdateInterval = 15000; // 每15秒更新一次矩阵
+const matrixUpdateInterval = 10000; // 每10秒更新一次矩阵
 
 const stats = new Stats();
 document.body.appendChild(stats.dom);
@@ -493,7 +494,7 @@ function animate(currentTime) {
   requestAnimationFrame(animate);
 
   // 在每次渲染时调用摄像机移动函数
-  moveCameraOnSphere(radius, 0.001, 0.001); // 传入角速度
+  // moveCameraOnSphere(radius, 0.0005, 0.0005); // 传入角速度
 
   // 更新视角控制，每帧都更新
   controls.update();
@@ -506,14 +507,14 @@ function animate(currentTime) {
   // 将当前时间转换为秒
   const deltaTime = (currentTime - lastRotationTime) / 1000;
 
-  // 每 15 秒更新一次矩阵
+  // 每 10 秒更新一次矩阵
   if (currentTime - lastMatrixUpdateTime > matrixUpdateInterval) {
     matrices = generateAllTransformations(elapsedTime);
     lastMatrixUpdateTime = currentTime;
   }
 
-  // 仅在每 0.01 秒时更新一次粒子旋转
-  if (deltaTime > 0.01) {
+  // 仅在每 0.005 秒时更新一次粒子旋转
+  if (deltaTime > 0.005) {
     lastRotationTime = currentTime;
 
     const opacityFactor = 0.995; // 每帧逐渐减小粒子的透明度
