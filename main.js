@@ -25,7 +25,18 @@ const camera = new THREE.PerspectiveCamera(
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 1);
 document.body.appendChild(renderer.domElement);
+
+// 设置画布的背景为渐变色
+renderer.domElement.style.background = `linear-gradient(
+    to bottom,
+    rgb(237, 231, 233) 0%,
+    rgb(109, 170, 214) 15%,
+    rgb(103, 100, 120) 65%,
+    rgb(69, 60, 60) 85%,
+    rgb(20, 20, 20) 100%
+)`;
 
 // 设置相机位置
 camera.position.z = 2;
