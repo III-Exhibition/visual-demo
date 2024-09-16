@@ -7,7 +7,7 @@ import Stats from "three/examples/jsm/libs/stats.module.js";
 import { mat4, vec3 } from "gl-matrix";
 // 引入 noise.js 并创建噪声实例
 import { Noise } from "noisejs";
-let noise = new Noise(1); // 使用随机种子初始化噪声
+let noise = new Noise(Math.random()); // 使用随机种子初始化噪声
 
 // 创建场景
 const scene = new THREE.Scene();
@@ -25,65 +25,31 @@ camera.position.z = 2;
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000, 0);
+renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
 
 // 设置画布的背景为渐变色
 renderer.domElement.style.background = `linear-gradient(
-    to bottom,
-    rgb(237, 231, 233) 0%,
-    rgb(109, 170, 214) 15%,
-    rgb(103, 100, 120) 65%,
-    rgb(69, 60, 60) 85%,
-    rgb(20, 20, 20) 100%
-  )`;
+  to bottom,
+  rgb(237, 231, 233) 0%,
+  rgb(109, 170, 214) 15%,
+  rgb(103, 100, 120) 65%,
+  rgb(69, 60, 60) 85%,
+  rgb(20, 20, 20) 100%
+)`;
 
 // 添加视角控制
 const controls = new OrbitControls(camera, renderer.domElement);
 
-// 定义上到下的颜色数组，可以随意调整颜色
-const layerColors = [
-  [0.929412, 0.905882, 0.913725], // 浅灰粉色
-  [0.921569, 0.568627, 0.607843], // 浅珊瑚红
-  [0.917647, 0.231373, 0.301961], // 鲜红色
-  [0.984314, 0.486275, 0.223529], // 橙色
-  [0.768627, 0.870588, 0.815686], // 浅青绿色
-  [0.894118, 0.760784, 0.792157], // 浅粉红色
-];
-
-// 获取粒子到原点的距离，并进行分层
-function getColorByDistance(x, y, z, radius) {
-  const distance = Math.sqrt(x * x + y * y + z * z); // 计算粒子到原点的距离
-  const layerRatio = distance / radius; // 距离占球体半径的比例
-
-  // 根据距离比例划分为 6 层
-  const layerIndex = Math.floor(layerRatio * 6);
-  const layerIndexClamped = Math.min(layerIndex, 5); // 确保索引不超过 5
-
-  // 计算渐变比例
-  const layerStart = layerIndexClamped / 6; // 每层开始的位置
-  const layerEnd = (layerIndexClamped + 1) / 6; // 每层结束的位置
-  const blendFactor = (layerRatio - layerStart) / (layerEnd - layerStart); // 渐变因子
-
-  // 返回两种颜色之间的线性插值
-  if (layerIndexClamped < 5) {
-    return lerpColor(
-      layerColors[layerIndexClamped],
-      layerColors[layerIndexClamped + 1],
-      blendFactor
-    );
-  } else {
-    return layerColors[5]; // 最后一层的颜色不需要渐变
-  }
-}
-
-// 线性插值函数，用于颜色渐变
-function lerpColor(color1, color2, factor) {
-  return [
-    color1[0] + (color2[0] - color1[0]) * factor,
-    color1[1] + (color2[1] - color1[1]) * factor,
-    color1[2] + (color2[2] - color1[2]) * factor,
-  ];
-}
+// 定义球面区域的颜色
+const faceColors = {
+  "+X": [0.929412, 0.905882, 0.913725], // 浅粉色
+  "-X": [0.921569, 0.568627, 0.607843], // 淡蓝色
+  "+Y": [0.917647, 0.231373, 0.301961], // 灰蓝色
+  "-Y": [0.984314, 0.486275, 0.223529], // 深灰蓝色
+  "+Z": [0.768627, 0.870588, 0.815686], // 深红棕色
+  "-Z": [0.894118, 0.760784, 0.792157], // 接近黑色
+};
 
 // 生成球面上的随机点
 function getRandomPositionOnSphere(radius) {
@@ -115,36 +81,32 @@ function getRandomPositionInSphere(radius) {
 }
 
 // 根据顶点的空间位置确定其所在的区域
-// function getColorByPosition(x, y, z) {
-//   if (Math.abs(x) >= Math.abs(y) && Math.abs(x) >= Math.abs(z)) {
-//     return x >= 0 ? faceColors["+X"] : faceColors["-X"];
-//   } else if (Math.abs(y) >= Math.abs(x) && Math.abs(y) >= Math.abs(z)) {
-//     return y >= 0 ? faceColors["+Y"] : faceColors["-Y"];
-//   } else {
-//     return z >= 0 ? faceColors["+Z"] : faceColors["-Z"];
-//   }
-// }
+function getColorByPosition(x, y, z) {
+  if (Math.abs(x) >= Math.abs(y) && Math.abs(x) >= Math.abs(z)) {
+    return x >= 0 ? faceColors["+X"] : faceColors["-X"];
+  } else if (Math.abs(y) >= Math.abs(x) && Math.abs(y) >= Math.abs(z)) {
+    return y >= 0 ? faceColors["+Y"] : faceColors["-Y"];
+  } else {
+    return z >= 0 ? faceColors["+Z"] : faceColors["-Z"];
+  }
+}
 
 // 初始化顶点缓冲区和权重缓冲区
-const numPoints = 150000; // 10 万个点
+const numPoints = 200000; // 10 万个点
 const size = 2; // 球的直径为 4，半径为 2
 const radius = size / 2; // 球的半径
-
-// 找到 y 坐标的最大值和最小值，确保所有粒子都能在 0 到 1 之间均匀分布
-const minY = -radius;
-const maxY = radius;
 
 const geometry = new THREE.BufferGeometry();
 const vertices = [];
 const colors = [];
 
-// 在生成顶点时应用新的颜色分配逻辑
+// 生成球面上的粒子并为每个粒子赋予不同的颜色
 for (let i = 0; i < numPoints; i++) {
   const [x, y, z] = getRandomPositionInSphere(radius);
   vertices.push(x, y, z, 0); // 新增 W 值，初始化为 0
 
-  // 根据距离获取颜色
-  const color = getColorByDistance(x, y, z, radius);
+  // 根据位置获取颜色
+  const color = getColorByPosition(x, y, z);
   colors.push(...color);
 }
 
@@ -173,7 +135,7 @@ scene.add(points);
 
 // 添加坐标轴
 const axesHelper = new THREE.AxesHelper(5); // 5 表示坐标轴的长度
-scene.add(axesHelper);
+// scene.add(axesHelper);
 
 // 添加标尺函数
 function createRuler(axis, length, interval) {
@@ -206,9 +168,9 @@ const xRuler = createRuler("x", 5, 1);
 const yRuler = createRuler("y", 5, 1);
 const zRuler = createRuler("z", 5, 1);
 
-scene.add(xRuler);
-scene.add(yRuler);
-scene.add(zRuler);
+// scene.add(xRuler);
+// scene.add(yRuler);
+// scene.add(zRuler);
 
 // 创建字体加载器
 const fontLoader = new FontLoader();
@@ -230,19 +192,19 @@ fontLoader.load(
     const xTextGeometry = new TextGeometry("X", textOptions);
     const xTextMesh = new THREE.Mesh(xTextGeometry, textMaterial);
     xTextMesh.position.set(5.5, 0, 0); // 放置在 X 轴末端
-    scene.add(xTextMesh);
+    // scene.add(xTextMesh);
 
     // Y 轴标记
     const yTextGeometry = new TextGeometry("Y", textOptions);
     const yTextMesh = new THREE.Mesh(yTextGeometry, textMaterial);
     yTextMesh.position.set(0, 5.5, 0); // 放置在 Y 轴末端
-    scene.add(yTextMesh);
+    // scene.add(yTextMesh);
 
     // Z 轴标记
     const zTextGeometry = new TextGeometry("Z", textOptions);
     const zTextMesh = new THREE.Mesh(zTextGeometry, textMaterial);
     zTextMesh.position.set(0, 0, 5.5); // 放置在 Z 轴末端
-    scene.add(zTextMesh);
+    // scene.add(zTextMesh);
   }
 );
 
@@ -561,7 +523,7 @@ function animate(currentTime) {
 
   // 每 10 秒更新一次矩阵
   if (currentTime - lastMatrixUpdateTime > matrixUpdateInterval) {
-    // matrices = generateAllTransformations(elapsedTime);
+    matrices = generateAllTransformations(elapsedTime);
     lastMatrixUpdateTime = currentTime;
   }
 
