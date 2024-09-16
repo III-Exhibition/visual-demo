@@ -191,19 +191,19 @@ fontLoader.load(
     const xTextGeometry = new TextGeometry("X", textOptions);
     const xTextMesh = new THREE.Mesh(xTextGeometry, textMaterial);
     xTextMesh.position.set(5.5, 0, 0); // 放置在 X 轴末端
-    scene.add(xTextMesh);
+    // scene.add(xTextMesh);
 
     // Y 轴标记
     const yTextGeometry = new TextGeometry("Y", textOptions);
     const yTextMesh = new THREE.Mesh(yTextGeometry, textMaterial);
     yTextMesh.position.set(0, 5.5, 0); // 放置在 Y 轴末端
-    scene.add(yTextMesh);
+    // scene.add(yTextMesh);
 
     // Z 轴标记
     const zTextGeometry = new TextGeometry("Z", textOptions);
     const zTextMesh = new THREE.Mesh(zTextGeometry, textMaterial);
     zTextMesh.position.set(0, 0, 5.5); // 放置在 Z 轴末端
-    scene.add(zTextMesh);
+    // scene.add(zTextMesh);
   }
 );
 
