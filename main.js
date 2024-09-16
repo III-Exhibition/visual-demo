@@ -6,22 +6,29 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 // 创建场景、相机和渲染器
 const scene = new THREE.Scene();
-const aspect = window.innerWidth / window.innerHeight;
-const zoomFactor = 1; // 初始缩放因子为 1
-const camera = new THREE.OrthographicCamera(
-  -aspect * zoomFactor,
-  aspect * zoomFactor,
-  zoomFactor,
-  -zoomFactor,
+// const aspect = window.innerWidth / window.innerHeight;
+// const zoomFactor = 1.5; // 初始缩放因子为 1
+// const camera = new THREE.OrthographicCamera(
+//   -aspect * zoomFactor,
+//   aspect * zoomFactor,
+//   zoomFactor,
+//   -zoomFactor,
+//   0.1,
+//   1000
+// );
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
   0.1,
   1000
 );
-const renderer = new THREE.WebGLRenderer({ antialias: false });
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // 设置相机位置
-camera.position.z = 3;
+camera.position.z = 2;
 
 // 初始化 Stats 模块
 const stats = new Stats();
@@ -92,20 +99,20 @@ scene.add(particles);
 // 渲染循环
 let lastTime = performance.now();
 // 定义旋转速度向量，以每秒的角度为单位 (角度/秒)
-const rotationSpeedPerSecond = new THREE.Vector3(1.321, 8.598, 1.444); 
+const rotationSpeedPerSecond = new THREE.Vector3(1.321, 8.598, 1.444);
 
 // 将旋转速度从角度转换为弧度
 const rotationSpeed = rotationSpeedPerSecond.multiplyScalar(Math.PI / 180); // 统一转换为弧度
 
 function animate() {
-    const currentTime = performance.now();
-    const deltaTime = (currentTime - lastTime) / 1000; // 计算时间差，以秒为单位
-    lastTime = currentTime;
+  const currentTime = performance.now();
+  const deltaTime = (currentTime - lastTime) / 1000; // 计算时间差，以秒为单位
+  lastTime = currentTime;
 
-    // 根据 deltaTime 调整 x, y, z 方向的旋转
-    particles.rotation.x += rotationSpeed.x * deltaTime;
-    particles.rotation.y += rotationSpeed.y * deltaTime;
-    particles.rotation.z += rotationSpeed.z * deltaTime;
+  // 根据 deltaTime 调整 x, y, z 方向的旋转
+  particles.rotation.x += rotationSpeed.x * deltaTime;
+  particles.rotation.y += rotationSpeed.y * deltaTime;
+  particles.rotation.z += rotationSpeed.z * deltaTime;
 
   renderer.render(scene, camera);
   // 更新 Stats
@@ -118,18 +125,26 @@ animate();
 // 响应窗口大小变化
 window.addEventListener("resize", onWindowResize, false);
 
+// function onWindowResize() {
+//   const aspect = window.innerWidth / window.innerHeight;
+//   const zoomFactor = 1.5; // 可以根据需要动态调整
+
+//   // 根据 zoomFactor 和宽高比调整正交相机的视图体积
+//   camera.left = -aspect * zoomFactor;
+//   camera.right = aspect * zoomFactor;
+//   camera.top = zoomFactor;
+//   camera.bottom = -zoomFactor;
+
+//   camera.updateProjectionMatrix();
+
+//   // 更新渲染器尺寸
+//   renderer.setSize(window.innerWidth, window.innerHeight);
+// }
+
 function onWindowResize() {
-  const aspect = window.innerWidth / window.innerHeight;
-  const zoomFactor = 1; // 可以根据需要动态调整
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
 
-  // 根据 zoomFactor 和宽高比调整正交相机的视图体积
-  camera.left = -aspect * zoomFactor;
-  camera.right = aspect * zoomFactor;
-  camera.top = zoomFactor;
-  camera.bottom = -zoomFactor;
-
-  camera.updateProjectionMatrix();
-
-  // 更新渲染器尺寸
-  renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
 }
