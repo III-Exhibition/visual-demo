@@ -24,8 +24,18 @@ camera.position.z = 2;
 // 创建渲染器
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x101010, ); // 设置背景颜色为浅灰色
+renderer.setClearColor( 0x000000, 0 );
 document.body.appendChild(renderer.domElement);
+
+// 设置画布的背景为渐变色
+renderer.domElement.style.background = `linear-gradient(
+  to bottom,
+  rgb(237, 231, 233) 0%,
+  rgb(109, 170, 214) 15%,
+  rgb(103, 100, 120) 65%,
+  rgb(69, 60, 60) 85%,
+  rgb(20, 20, 20) 100%
+)`;
 
 // 添加视角控制
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -81,7 +91,7 @@ function getColorByPosition(x, y, z) {
 }
 
 // 初始化顶点缓冲区和权重缓冲区
-const numPoints = 150000; // 10 万个点
+const numPoints = 200000; // 10 万个点
 const size = 2; // 球的直径为 4，半径为 2
 const radius = size / 2; // 球的半径
 
@@ -124,7 +134,7 @@ scene.add(points);
 
 // 添加坐标轴
 const axesHelper = new THREE.AxesHelper(5); // 5 表示坐标轴的长度
-scene.add(axesHelper);
+// scene.add(axesHelper);
 
 // 添加标尺函数
 function createRuler(axis, length, interval) {
@@ -157,9 +167,9 @@ const xRuler = createRuler("x", 5, 1);
 const yRuler = createRuler("y", 5, 1);
 const zRuler = createRuler("z", 5, 1);
 
-scene.add(xRuler);
-scene.add(yRuler);
-scene.add(zRuler);
+// scene.add(xRuler);
+// scene.add(yRuler);
+// scene.add(zRuler);
 
 // 创建字体加载器
 const fontLoader = new FontLoader();
