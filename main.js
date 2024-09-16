@@ -1,135 +1,222 @@
-import * as THREE from "three";
-// 从 three.js 的 examples 引入 Stats
-import Stats from "three/examples/jsm/libs/stats.module.js";
-// 引入 OrbitControls
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { createNoise3D } from 'simplex-noise'; // 从simplex-noise v4导入createNoise3D
+
+// 创建 3D 噪声函数
+const noise3D = createNoise3D();
 
 // 创建场景、相机和渲染器
 const scene = new THREE.Scene();
-const aspect = window.innerWidth / window.innerHeight;
-const zoomFactor = 1; // 初始缩放因子为 1
-const camera = new THREE.OrthographicCamera(
-  -aspect * zoomFactor,
-  aspect * zoomFactor,
-  zoomFactor,
-  -zoomFactor,
-  0.1,
-  1000
-);
-const renderer = new THREE.WebGLRenderer({ antialias: false });
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setClearColor( 0x000000, 0 );
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// 设置相机位置
-camera.position.z = 3;
+// 设置画布的背景为渐变色
+renderer.domElement.style.background = `linear-gradient(
+    to bottom,
+    rgb(237, 231, 233) 0%,
+    rgb(109, 170, 214) 15%,
+    rgb(103, 100, 120) 65%,
+    rgb(69, 60, 60) 85%,
+    rgb(20, 20, 20) 100%
+)`;
 
-// 初始化 Stats 模块
-const stats = new Stats();
-document.body.appendChild(stats.dom);
+// 创建粒子数量
+const particleCount = 200000;
+const geometry = new THREE.BufferGeometry();
+const positions = new Float32Array(particleCount * 3);
+const velocities = new Float32Array(particleCount * 3); // 粒子的速度
+const initialPositions = new Float32Array(particleCount * 3);
 
-// 创建 OrbitControls 来控制相机视角
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // 添加阻尼效果（惯性），更顺滑的控制
-controls.dampingFactor = 0.05;
-controls.screenSpacePanning = false; // 不允许屏幕空间平移
-controls.minDistance = 0.01; // 最小缩放距离
-controls.maxDistance = 100; // 最大缩放距离
+let time = 0;
 
-// 生成均匀分布在球体内的粒子
-function generateParticlesInSphere(numParticles, radius) {
-  const positions = new Float32Array(numParticles * 3);
-
-  for (let i = 0; i < numParticles; i++) {
-    // 生成从 -1 到 1 的均匀随机数（仅三个分量）
-    const rnd = [
-      Math.random() * 2 - 1,
-      Math.random() * 2 - 1,
-      Math.random() * 2 - 1,
-    ];
+// 生成粒子分布在球体内部
+const baseRadius = 70;  // 初始球体半径
+let dynamicRadius = baseRadius; // 用于动态调整的半径
+for (let i = 0; i < particleCount; i++) {
+    const rnd = [Math.random(), Math.random(), Math.random(), Math.random()];
 
     const twoPi = 2.0 * Math.PI;
-    const theta = twoPi * rnd[0]; // 从 rnd.s 得到的随机角度
-    const phi = Math.acos(2 * rnd[1] - 1.0); // 从 rnd.t 得到的球坐标角度
+    const theta = twoPi * rnd[0]; // 随机生成 theta
+    const phi = Math.acos(2 * rnd[1] - 1); // 随机生成 phi
     const third = 1.0 / 3.0;
-    const randomRadius = radius * Math.pow(Math.abs(rnd[2]), third); // 使用 rnd.p 来计算均匀半径
+    const r = Math.pow(rnd[2], third) * baseRadius; // 确保点均匀分布在体积内
 
-    // 计算点的球坐标
-    const x = Math.cos(theta) * Math.sin(phi);
-    const y = Math.sin(theta) * Math.sin(phi);
-    const z = Math.cos(phi);
+    const x = r * Math.cos(theta) * Math.sin(phi);
+    const y = r * Math.sin(theta) * Math.sin(phi);
+    const z = r * Math.cos(phi);
 
-    // 应用半径，得到均匀分布在球体内的点
-    positions[i * 3] = x * randomRadius;
-    positions[i * 3 + 1] = y * randomRadius;
-    positions[i * 3 + 2] = z * randomRadius;
-  }
+    initialPositions[i * 3] = x;
+    initialPositions[i * 3 + 1] = y;
+    initialPositions[i * 3 + 2] = z;
+    
+    positions[i * 3] = x;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = z;
 
-  return positions;
+    // 初始化粒子的速度为0
+    velocities[i * 3] = 0;
+    velocities[i * 3 + 1] = 0;
+    velocities[i * 3 + 2] = 0;
 }
 
-// 调用函数生成 100 万个粒子，半径为 1
-const numParticles = 1000000;
-const radius = 1; // 可调整的球体半径
-const positions = generateParticlesInSphere(numParticles, radius);
+// 设置几何体的位置
+geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-// 创建顶点缓冲区
-const geometry = new THREE.BufferGeometry();
-geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-
-// 创建材质
+// 更新材质使其支持顶点颜色
 const material = new THREE.PointsMaterial({
-  color: 0xffffff,
-  size: 1,
-  sizeAttenuation: false,
-  transparent: true,
-  opacity: 0.7,
+    vertexColors: true,  // 启用顶点颜色
+    size: 1,
+    sizeAttenuation: false,
+    transparent: true,
+    opacity: 0.7,
+    depthWrite: false,
 });
 
-// 创建粒子系统
+// 创建粒子系统并添加到场景中
 const particles = new THREE.Points(geometry, material);
 scene.add(particles);
 
-// 渲染循环
-let lastTime = performance.now();
-// 定义旋转速度向量，以每秒的角度为单位 (角度/秒)
-const rotationSpeedPerSecond = new THREE.Vector3(1.321, 8.598, 1.444); 
+// 设置相机位置
+camera.position.z = 150;
 
-// 将旋转速度从角度转换为弧度
-const rotationSpeed = rotationSpeedPerSecond.multiplyScalar(Math.PI / 180); // 统一转换为弧度
+// 添加OrbitControls
+const controls = new OrbitControls(camera, renderer.domElement);
 
+// 函数：允许边界范围动态变化，并根据噪声进行扩散
+function updateDynamicRadius() {
+    // 动态调整的基础是保持一定范围
+    const expansionFactor = 5; // 控制扩散幅度
+    dynamicRadius = baseRadius + Math.sin(time * 0.5) * expansionFactor; // 基于正弦函数变化
+}
+
+// 函数：将粒子限制在不规则的边界内，并让边界受噪声控制
+function constrainToIrregularShape(positions, velocities, baseRadius) {
+    for (let i = 0; i < particleCount; i++) {
+        const x = positions[i * 3];
+        const y = positions[i * 3 + 1];
+        const z = positions[i * 3 + 2];
+        const distance = Math.sqrt(x * x + y * y + z * z);
+
+        // 使用噪声生成不规则的半径边界
+        const noiseFactor = 10; // 控制噪声影响大小
+        const irregularRadius = baseRadius + noise3D(x * 0.05, y * 0.05, time) * noiseFactor;
+
+        // 如果粒子超出当前不规则半径边界，则将其拉回
+        if (distance > irregularRadius) {
+            const factor = irregularRadius / distance;
+            positions[i * 3] = x * factor;
+            positions[i * 3 + 1] = y * factor;
+            positions[i * 3 + 2] = z * factor;
+
+            // 减缓速度，避免剧烈移动
+            velocities[i * 3] *= 0.95;
+            velocities[i * 3 + 1] *= 0.95;
+            velocities[i * 3 + 2] *= 0.95;
+        }
+    }
+}
+
+// 在渲染循环的开头创建颜色渐变数组
+const colors = new Float32Array(particleCount * 3);
+
+// 创建用于颜色渐变的色板
+const colorStops = [
+    new THREE.Color(0xEDE7E9),  // 到球心最近的颜色
+    new THREE.Color(0xEA3B4D),
+    new THREE.Color(0xFB7C39),
+    new THREE.Color(0xC4DED0),
+    new THREE.Color(0xE4C2CA),  // 到球心最远的颜色
+];
+
+// 函数：根据距离映射颜色
+function mapDistanceToColor(distance, maxDistance) {
+    const ratio = distance / maxDistance;
+    const numStops = colorStops.length;
+    const scaledRatio = ratio * (numStops - 1);
+    const lowerIndex = Math.floor(scaledRatio);
+    const upperIndex = Math.min(lowerIndex + 1, numStops - 1);
+    const blendFactor = scaledRatio - lowerIndex;
+
+    const color = new THREE.Color();
+    color.lerpColors(colorStops[lowerIndex], colorStops[upperIndex], blendFactor);
+    return color;
+}
+
+
+// 在 animate 函数中更新粒子的颜色
 function animate() {
-    const currentTime = performance.now();
-    const deltaTime = (currentTime - lastTime) / 1000; // 计算时间差，以秒为单位
-    lastTime = currentTime;
+    requestAnimationFrame(animate);
 
-    // 根据 deltaTime 调整 x, y, z 方向的旋转
-    particles.rotation.x += rotationSpeed.x * deltaTime;
-    particles.rotation.y += rotationSpeed.y * deltaTime;
-    particles.rotation.z += rotationSpeed.z * deltaTime;
+    time += 0.01; // 控制时间因素
 
-  renderer.render(scene, camera);
-  // 更新 Stats
-  stats.update();
-  requestAnimationFrame(animate);
+    // 动态更新粒子的运动范围
+    updateDynamicRadius();
+
+    // 更新每个粒子的位置和颜色，模拟扭曲和烟雾效果
+    const positionsArray = geometry.attributes.position.array;
+    const maxDistance = baseRadius + 10; // 动态范围最大值，用于颜色映射
+    for (let i = 0; i < particleCount; i++) {
+        const x = positionsArray[i * 3];
+        const y = positionsArray[i * 3 + 1];
+        const z = positionsArray[i * 3 + 2];
+
+        // 计算到球心的距离
+        const distance = Math.sqrt(x * x + y * y + z * z);
+
+        // 映射距离到颜色
+        const color = mapDistanceToColor(distance, maxDistance);
+
+        // 更新颜色数组
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+
+        // Simplex 噪声模拟湍流，结合旋转和扭曲
+        const noiseFactor = 2; // 调整噪声影响强度，使其像烟雾
+        const windX = noise3D(x * 0.05, y * 0.05, time) * noiseFactor;
+        const windY = noise3D(y * 0.05, z * 0.05, time) * noiseFactor;
+        const windZ = noise3D(z * 0.05, x * 0.05, time) * noiseFactor;
+
+        // 更新粒子的速度
+        velocities[i * 3] += windX * 0.01;
+        velocities[i * 3 + 1] += windY * 0.01;
+        velocities[i * 3 + 2] += windZ * 0.01;
+
+        // 更新粒子的位置
+        positionsArray[i * 3] += velocities[i * 3];
+        positionsArray[i * 3 + 1] += velocities[i * 3 + 1];
+        positionsArray[i * 3 + 2] += velocities[i * 3 + 2];
+    }
+
+    // 将粒子限制在动态扩散的边界内，且边界不规则
+    constrainToIrregularShape(positionsArray, velocities, dynamicRadius);
+
+    geometry.attributes.position.needsUpdate = true; // 告诉渲染器更新位置
+
+    // 更新粒子的颜色
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.attributes.color.needsUpdate = true;
+
+    // 粒子整体旋转
+    particles.rotation.x += 0.005;
+    particles.rotation.y += 0.005;
+
+    // 更新控件
+    controls.update();
+
+    renderer.render(scene, camera);
 }
 
+// 监听窗口大小改变，调整渲染器尺寸
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// 开始动画
 animate();
-
-// 响应窗口大小变化
-window.addEventListener("resize", onWindowResize, false);
-
-function onWindowResize() {
-  const aspect = window.innerWidth / window.innerHeight;
-  const zoomFactor = 1; // 可以根据需要动态调整
-
-  // 根据 zoomFactor 和宽高比调整正交相机的视图体积
-  camera.left = -aspect * zoomFactor;
-  camera.right = aspect * zoomFactor;
-  camera.top = zoomFactor;
-  camera.bottom = -zoomFactor;
-
-  camera.updateProjectionMatrix();
-
-  // 更新渲染器尺寸
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
