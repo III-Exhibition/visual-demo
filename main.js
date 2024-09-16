@@ -50,12 +50,39 @@ const layerColors = [
   [0.894118, 0.760784, 0.792157], // 浅粉红色
 ];
 
-// 根据粒子的 y 值确定其所在的层并分配颜色
-function getColorByPosition(y, minY, maxY) {
-  const layerHeight = (maxY - minY) / 6; // 将 y 坐标范围划分为 6 层
-  let layerIndex = Math.floor((y - minY) / layerHeight); // 确定粒子所在的层
-  layerIndex = Math.min(layerIndex, 5); // 确保索引不超过数组长度
-  return layerColors[layerIndex]; // 返回对应层的颜色
+// 获取粒子到原点的距离，并进行分层
+function getColorByDistance(x, y, z, radius) {
+  const distance = Math.sqrt(x * x + y * y + z * z); // 计算粒子到原点的距离
+  const layerRatio = distance / radius; // 距离占球体半径的比例
+
+  // 根据距离比例划分为 6 层
+  const layerIndex = Math.floor(layerRatio * 6);
+  const layerIndexClamped = Math.min(layerIndex, 5); // 确保索引不超过 5
+
+  // 计算渐变比例
+  const layerStart = layerIndexClamped / 6; // 每层开始的位置
+  const layerEnd = (layerIndexClamped + 1) / 6; // 每层结束的位置
+  const blendFactor = (layerRatio - layerStart) / (layerEnd - layerStart); // 渐变因子
+
+  // 返回两种颜色之间的线性插值
+  if (layerIndexClamped < 5) {
+    return lerpColor(
+      layerColors[layerIndexClamped],
+      layerColors[layerIndexClamped + 1],
+      blendFactor
+    );
+  } else {
+    return layerColors[5]; // 最后一层的颜色不需要渐变
+  }
+}
+
+// 线性插值函数，用于颜色渐变
+function lerpColor(color1, color2, factor) {
+  return [
+    color1[0] + (color2[0] - color1[0]) * factor,
+    color1[1] + (color2[1] - color1[1]) * factor,
+    color1[2] + (color2[2] - color1[2]) * factor,
+  ];
 }
 
 // 生成球面上的随机点
@@ -111,13 +138,13 @@ const geometry = new THREE.BufferGeometry();
 const vertices = [];
 const colors = [];
 
-// 为每个粒子分配颜色
+// 在生成顶点时应用新的颜色分配逻辑
 for (let i = 0; i < numPoints; i++) {
   const [x, y, z] = getRandomPositionInSphere(radius);
   vertices.push(x, y, z, 0); // 新增 W 值，初始化为 0
 
-  // 根据 y 值计算颜色
-  const color = getColorByPosition(y, minY, maxY);
+  // 根据距离获取颜色
+  const color = getColorByDistance(x, y, z, radius);
   colors.push(...color);
 }
 
