@@ -25,7 +25,7 @@ const camera = new THREE.PerspectiveCamera(
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x000000, 1);
+renderer.setClearColor(0x000000, 0);
 document.body.appendChild(renderer.domElement);
 
 // 设置画布的背景为渐变色
@@ -37,6 +37,16 @@ renderer.domElement.style.background = `linear-gradient(
     rgb(69, 60, 60) 85%,
     rgb(20, 20, 20) 100%
 )`;
+
+// 定义球面区域的颜色
+const faceColors = {
+  "+X": [0.929412, 0.905882, 0.913725], // 浅灰粉色
+  "-X": [0.921569, 0.568627, 0.607843], // 浅珊瑚红
+  "+Y": [0.917647, 0.231373, 0.301961], // 鲜红色
+  "-Y": [0.984314, 0.486275, 0.223529], // 橙色
+  "+Z": [0.768627, 0.870588, 0.815686], // 浅青绿色
+  "-Z": [0.894118, 0.760784, 0.792157], // 浅粉红色
+};
 
 // 设置相机位置
 camera.position.z = 2;
@@ -85,18 +95,68 @@ function generateParticlesInSphere(numParticles, radius) {
   return positions;
 }
 
+// 计算颜色的辅助函数，非线性渐变反转，靠近球面时变为白色
+function calculateNonlinearColor(regionColor, distance, maxDistance) {
+  const white = [1.0, 1.0, 1.0]; // 白色
+  const color = [];
+
+  // 使用反转的非线性渐变，使得靠近球心时保持原始颜色，靠近球面时渐变为白色
+  const t = 1 - Math.pow(distance / maxDistance, 30); // 非线性反转
+  // t = 1 时为分区颜色，t = 0 时为白色
+
+  for (let i = 0; i < 3; i++) {
+    color[i] = white[i] + (regionColor[i] - white[i]) * t;
+  }
+
+  return color;
+}
+
+// 包装颜色设置逻辑的函数
+function assignColorsToParticles(positions, colors, numParticles, maxDistance) {
+  for (let i = 0; i < numParticles; i++) {
+    const x = positions[i * 3];
+    const y = positions[i * 3 + 1];
+    const z = positions[i * 3 + 2];
+    const distance = Math.sqrt(x * x + y * y + z * z); // 点到球心的距离
+
+    let regionColor;
+
+    // 确定粒子所在的区域
+    if (Math.abs(x) > Math.abs(y) && Math.abs(x) > Math.abs(z)) {
+      regionColor = x > 0 ? faceColors["+X"] : faceColors["-X"];
+    } else if (Math.abs(y) > Math.abs(x) && Math.abs(y) > Math.abs(z)) {
+      regionColor = y > 0 ? faceColors["+Y"] : faceColors["-Y"];
+    } else {
+      regionColor = z > 0 ? faceColors["+Z"] : faceColors["-Z"];
+    }
+
+    // 计算粒子的颜色，使用非线性渐变
+    const color = calculateNonlinearColor(regionColor, distance, maxDistance);
+
+    // 设置粒子的颜色
+    colors[i * 3] = color[0];
+    colors[i * 3 + 1] = color[1];
+    colors[i * 3 + 2] = color[2];
+  }
+}
+
 // 调用函数生成 100 万个粒子，半径为 1
 const numParticles = 1000000;
 const radius = 1; // 可调整的球体半径
 const positions = generateParticlesInSphere(numParticles, radius);
+const colors = new Float32Array(numParticles * 3); // 每个粒子有 R、G、B 颜色
+
+// 调用颜色设置函数
+assignColorsToParticles(positions, colors, numParticles, radius);
 
 // 创建顶点缓冲区
 const geometry = new THREE.BufferGeometry();
 geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3)); // 设置颜色缓冲区
 
-// 创建材质
+// 创建材质，支持顶点颜色
 const material = new THREE.PointsMaterial({
-  color: 0xffffff,
+  vertexColors: true, // 开启顶点颜色
   size: 1,
   sizeAttenuation: false,
   transparent: true,
@@ -153,9 +213,29 @@ window.addEventListener("resize", onWindowResize, false);
 // }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
 
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
 }
+
+function saveCurrentCanvasAsImage() {
+  // 确保渲染器使用透明背景
+  renderer.setClearColor(0x000000, 0); // 设置背景为透明
+
+  // 渲染当前场景
+  renderer.render(scene, camera);
+
+  // 将渲染的结果转换为图片数据URL
+  const imgData = renderer.domElement.toDataURL("image/png");
+
+  // 创建一个链接并触发下载
+  const link = document.createElement("a");
+  link.href = imgData;
+  link.download = "rendered_scene.png";
+  link.click();
+}
+
+// 调用函数保存当前渲染画布
+// saveCurrentCanvasAsImage();
