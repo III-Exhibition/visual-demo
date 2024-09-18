@@ -103,7 +103,7 @@ const colors = [];
 // 生成球面上的粒子并为每个粒子赋予不同的颜色
 for (let i = 0; i < numPoints; i++) {
   const [x, y, z] = getRandomPositionInSphere(radius);
-  vertices.push(x, y, z, 0); // 新增 W 值，初始化为 0
+  vertices.push(x, y, z, 1); // 新增 W 值，初始化为 0
 
   // 根据位置获取颜色
   const color = getColorByPosition(x, y, z);
@@ -126,7 +126,7 @@ const material = new THREE.PointsMaterial({
   vertexColors: true,
   sizeAttenuation: false,
   transparent: true,
-  opacity: 0.8,
+  opacity: 0.7,
 });
 const points = new THREE.Points(geometry, material);
 
@@ -389,23 +389,23 @@ function generateAllTransformations(elapsedTime) {
     rotation: { x: 0, y: 0, z: 0 },
     scale: { x: 0.5, y: 0.5, z: 0.5 },
     translation: {
-      x: 0,
-      y: elapsedTime * getRandomInRange(-0.8, 0.8),
-      z: 0,
+      x: elapsedTime * getRandomInRange(-1, 1),
+      y: elapsedTime * getRandomInRange(-1, 1),
+      z: elapsedTime * getRandomInRange(-1, 1),
     },
   };
 
   // 为 applyRotationWithLerp 函数生成变换参数
   transformationParams.rotationLerp = {
     rotation: {
-      x: getRandomInRange(-5.49779, 5.49779),
-      y: getRandomInRange(-7.85398, 7.85398),
-      z: getRandomInRange(-10.9956, 10.9956),
+      x: getRandomInRange(-20, 20),
+      y: getRandomInRange(-20, 20),
+      z: getRandomInRange(-20, 20),
     },
     scale: {
-      x: 1 + Math.random() / 2.3458345,
-      y: 1 + Math.random() / 4.8923434,
-      z: 1 + Math.random() / 3.5780998,
+      x: 1 + Math.random() / 5,
+      y: 1 + Math.random() / 5,
+      z: 1 + Math.random() / 5,
     },
     translation: { x: 0, y: 0, z: 0 },
   };
@@ -413,9 +413,9 @@ function generateAllTransformations(elapsedTime) {
   // 为背景生成变换参数
   transformationParams.background = {
     rotation: {
-      x: getRandomInRange(-0.174927, 0.174927),
-      y: getRandomInRange(-1.570796, 1.570796),
-      z: getRandomInRange(-2.96706, 2.96706),
+      x: getRandomInRange(-5, 5),
+      y: getRandomInRange(-5, 5),
+      z: getRandomInRange(-5, 5),
     },
     scale: {
       x: 1,
@@ -497,7 +497,7 @@ let startTime = null;
 let flashDuration = 100; // 闪烁的持续时间（以毫秒为单位）
 let matrices = generateAllTransformations(0);
 let lastMatrixUpdateTime = 0;
-const matrixUpdateInterval = 6000; // 每10秒更新一次矩阵
+const matrixUpdateInterval = 8000; // 每10秒更新一次矩阵
 
 const stats = new Stats();
 document.body.appendChild(stats.dom);
@@ -531,7 +531,7 @@ function animate(currentTime) {
   if (deltaTime > 0.005) {
     lastRotationTime = currentTime;
 
-    const opacityFactor = 0.996; // 每帧逐渐减小粒子的透明度
+    const opacityFactor = 0.998; // 每帧逐渐减小粒子的透明度
 
     // 获取顶点和权重缓冲区
     const verticesArray = geometry.attributes.position.array;
@@ -552,7 +552,6 @@ function animate(currentTime) {
     // 每帧都调用 changeOpacity 函数，逐渐把粒子向原点聚拢
     changeOpacity(verticesArray, opacityFactor);
 
-    geometry.attributes.position.needsUpdate = true;
     geometry.attributes.position.needsUpdate = true;
   }
 
