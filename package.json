@@ -6,6 +6,8 @@
     "buildCf": "vite build --mode cf"
   },
   "dependencies": {
+    "gl-matrix": "^3.4.3",
+    "noisejs": "^2.1.0",
     "simplex-noise": "^4.0.3",
     "three": "^0.168.0"
   },
