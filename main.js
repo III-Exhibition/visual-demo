@@ -92,7 +92,7 @@ function getColorByPosition(x, y, z) {
 }
 
 // 初始化顶点缓冲区和权重缓冲区
-const numPoints = 200000; // 10 万个点
+const numPoints = 500000; // 10 万个点
 const size = 2; // 球的直径为 4，半径为 2
 const radius = size / 2; // 球的半径
 
@@ -497,7 +497,7 @@ let startTime = null;
 let flashDuration = 100; // 闪烁的持续时间（以毫秒为单位）
 let matrices = generateAllTransformations(0);
 let lastMatrixUpdateTime = 0;
-const matrixUpdateInterval = 8000; // 每10秒更新一次矩阵
+const matrixUpdateInterval = 20000; // 每10秒更新一次矩阵
 
 const stats = new Stats();
 document.body.appendChild(stats.dom);
