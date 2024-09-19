@@ -19,7 +19,7 @@ const camera = new THREE.PerspectiveCamera(
 );
 // camera.position.x = 1;
 // camera.position.y = 1;
-camera.position.z = 2.5;
+camera.position.z = 2;
 
 // 创建渲染器
 const renderer = new THREE.WebGLRenderer();
@@ -47,7 +47,6 @@ const faceColors = {
   "+Z": [0.768627, 0.870588, 0.815686], // 浅青绿色
   "-Z": [0.894118, 0.760784, 0.792157], // 浅粉红色
 };
-
 
 // 根据顶点的空间位置确定其所在的区域
 function getColorByPosition(x, y, z) {
@@ -77,7 +76,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 
   // 创建坐标轴辅助对象，长度为5
   const axesHelper = new THREE.AxesHelper(5);
-  scene.add(axesHelper);
+  // scene.add(axesHelper);
 
   // 添加标尺函数
   function createRuler(axis, length, interval) {
@@ -110,9 +109,9 @@ const controls = new OrbitControls(camera, renderer.domElement);
   const yRuler = createRuler("y", 5, 1);
   const zRuler = createRuler("z", 5, 1);
 
-  scene.add(xRuler);
-  scene.add(yRuler);
-  scene.add(zRuler);
+  // scene.add(xRuler);
+  // scene.add(yRuler);
+  // scene.add(zRuler);
 
   // 创建字体加载器
   const fontLoader = new FontLoader();
@@ -133,19 +132,19 @@ const controls = new OrbitControls(camera, renderer.domElement);
       const xTextGeometry = new TextGeometry("X", textOptions);
       const xTextMesh = new THREE.Mesh(xTextGeometry, textMaterial);
       xTextMesh.position.set(5.5, 0, 0); // 放置在 X 轴末端
-      scene.add(xTextMesh);
+      // scene.add(xTextMesh);
 
       // Y 轴标记
       const yTextGeometry = new TextGeometry("Y", textOptions);
       const yTextMesh = new THREE.Mesh(yTextGeometry, textMaterial);
       yTextMesh.position.set(0, 5.5, 0); // 放置在 Y 轴末端
-      scene.add(yTextMesh);
+      // scene.add(yTextMesh);
 
       // Z 轴标记
       const zTextGeometry = new TextGeometry("Z", textOptions);
       const zTextMesh = new THREE.Mesh(zTextGeometry, textMaterial);
       zTextMesh.position.set(0, 0, 5.5); // 放置在 Z 轴末端
-      scene.add(zTextMesh);
+      // scene.add(zTextMesh);
     }
   );
 
@@ -195,13 +194,14 @@ function generateTransformationMatrix(
 
 // 设置纹理大小
 const size = 2048; // 纹理大小为3x3，可以容纳9个粒子
-const radius = 1.0; // 球体半径
+const radius = 1; // 球体半径
 const gpuCompute = new GPUComputationRenderer(size, size, renderer);
 
 // 检查 WebGL2 支持
-if (renderer.capabilities.isWebGL2 === false) {
-  alert("GPUComputationRenderer 需要 WebGL2 支持");
-}
+// if (renderer.capabilities.isWebGL2 === false) {
+//   alert("GPUComputationRenderer 需要 WebGL2 支持");
+// }
+
 // 生成球面上的随机点
 function getRandomPositionOnSphere(radius) {
   const u = Math.random();
@@ -278,8 +278,8 @@ const computeFragmentShader = `
     vec3 interpolatedPosition = mix(previousPosition.xyz, newPosition, noiseValue);
 
     // 混合 interpolatedPosition 和 transformedBackgroundPosition, alpha 为 0.99
-    interpolatedPosition *= 0.9998;
-    vec3 finalPosition = mix(backgroundPosition.xyz, interpolatedPosition.xyz, 0.9998);
+    interpolatedPosition *= 0.9996;
+    vec3 finalPosition = mix(backgroundPosition.xyz, interpolatedPosition.xyz, 0.9996);
 
     // 设置最终的位置
     gl_FragColor = vec4(finalPosition.xyz, 1.0);
@@ -326,14 +326,14 @@ gpuCompute.setVariableDependencies(backgroundPositionVariable, [
   backgroundPositionVariable,
 ]);
 
-function generateTransformationMatrices() {
+function generateTransformationMatrices(elapsedTime) {
   // 设置噪声变换的参数
   const noiseRotationAngles = { x: 2, y: 2, z: 2 }; // 旋转角度（单位：度）
   const noiseScaleFactors = { x: 0.5, y: 0.5, z: 0.5 }; // 缩放因子
   const noiseTranslationValues = {
-    x: getRandomInRange(-1, 1),
-    y: getRandomInRange(-1, 1),
-    z: getRandomInRange(-1, 1),
+    x: elapsedTime * getRandomInRange(-1, 1),
+    y: elapsedTime * getRandomInRange(-1, 1),
+    z: elapsedTime * getRandomInRange(-1, 1),
   }; // 平移值
 
   const noiseTransformationMatrix = new THREE.Matrix4().fromArray(
@@ -394,8 +394,7 @@ const {
   noiseTransformationMatrix,
   positionTransformationMatrix,
   backgroundTransformationMatrix,
-} = generateTransformationMatrices();
-
+} = generateTransformationMatrices(1);
 const rep = new THREE.Vector3(3.0, 3.0, 3.0); // 周期性噪声的 rep 参数
 
 // 设置 Uniforms
@@ -511,14 +510,53 @@ function getCameraConstant(camera) {
 
 // 动画循环
 const clock = new THREE.Clock();
+// 设置时间间隔（例如，每 5 秒调用一次函数）
+const interval = 6; // 单位为秒
+let elapsedTime = 0;
 
 function animate() {
+  // 获取从上次动画帧以来的时间增量
   const delta = clock.getDelta();
-  const elapsedTime = clock.elapsedTime;
+  // 增加累计时间
+  elapsedTime += delta;
 
-  // 更新计算器的 Uniforms
-  positionVariable.material.uniforms.time.value = elapsedTime;
-  positionVariable.material.uniforms.delta.value = delta;
+  // 当累计时间超过设定的间隔时调用函数
+  if (elapsedTime >= interval) {
+    const runningTime = clock.getElapsedTime()
+    const {
+      noiseTransformationMatrix,
+      positionTransformationMatrix,
+      backgroundTransformationMatrix,
+    } = generateTransformationMatrices(runningTime);
+    const rep = new THREE.Vector3(3.0, 3.0, 3.0); // 周期性噪声的 rep 参数
+
+    console.log("Updating transformation matrices");
+    console.log("Noise transformation matrix:");
+    console.log(noiseTransformationMatrix);
+    console.log("Position transformation matrix:");
+    console.log(positionTransformationMatrix);
+    console.log("Background transformation matrix:");
+    console.log(backgroundTransformationMatrix);
+    console.log("Rep:");
+    console.log(rep);
+    console.log("Elapsed time:");
+    console.log(runningTime);
+
+    // 设置 Uniforms
+    positionVariable.material.uniforms.time = { value: 0.0 };
+    positionVariable.material.uniforms.delta = { value: 0.0 };
+    positionVariable.material.uniforms.noiseTransformMatrix = {
+      value: noiseTransformationMatrix,
+    };
+    positionVariable.material.uniforms.positionTransformMatrix = {
+      value: positionTransformationMatrix,
+    };
+    backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
+      value: backgroundTransformationMatrix,
+    };
+    positionVariable.material.uniforms.rep = { value: rep };
+    elapsedTime = 0; // 重置累计时间
+  }
 
   // 计算下一帧的位置
   gpuCompute.compute();
