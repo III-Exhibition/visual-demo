@@ -17,9 +17,9 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.x = 2;
-camera.position.y = 2;
-camera.position.z = 2;
+// camera.position.x = 1;
+// camera.position.y = 1;
+camera.position.z = 2.5;
 
 // 创建渲染器
 const renderer = new THREE.WebGLRenderer();
@@ -32,7 +32,6 @@ document.body.appendChild(stats.dom);
 
 // 创建 OrbitControls 实例
 const controls = new OrbitControls(camera, renderer.domElement);
-
 
 {
   // 可选配置
@@ -162,18 +161,13 @@ function generateTransformationMatrix(
 }
 
 // 设置纹理大小
-const size = 1024; // 纹理大小为3x3，可以容纳9个粒子
+const size = 2048; // 纹理大小为3x3，可以容纳9个粒子
 const gpuCompute = new GPUComputationRenderer(size, size, renderer);
 
 // 检查 WebGL2 支持
 if (renderer.capabilities.isWebGL2 === false) {
   alert("GPUComputationRenderer 需要 WebGL2 支持");
 }
-
-// 创建初始位置纹理
-const initialPosition = gpuCompute.createTexture();
-const posArray = initialPosition.image.data;
-
 // 生成球面上的随机点
 function getRandomPositionOnSphere(radius) {
   const u = Math.random();
@@ -203,6 +197,15 @@ function getRandomPositionInSphere(radius) {
   return [x, y, z];
 }
 
+// 生成 [a, b] 范围内均匀分布的随机数
+function getRandomInRange(a, b) {
+  return Math.random() * (b - a) + a;
+}
+
+// 创建初始位置纹理
+const initialPosition = gpuCompute.createTexture();
+const posArray = initialPosition.image.data;
+
 // 初始化位置数据，每个粒子的位置为球体上的随机点
 for (let i = 0; i < posArray.length; i += 4) {
   [posArray[i], posArray[i + 1], posArray[i + 2]] =
@@ -210,14 +213,16 @@ for (let i = 0; i < posArray.length; i += 4) {
   posArray[i + 3] = 1.0; // w
 }
 
+// 创建背景点云位置的纹理
+const backgroundPosition = gpuCompute.createTexture();
+backgroundPosition.image.data.set(posArray);
+
 const computeFragmentShader = `
   ${pnoise3D} // 包含 Perlin 噪声函数的 GLSL 代码
 
-  uniform float time;                    // 时间
-  
-  uniform mat4 noiseTransformMatrix;      // 4x4 变换矩阵用于计算 Noise
-  uniform mat4 positionTransformMatrix;   // 新的 4x4 变换矩阵，用于对粒子位置进行变换
-  uniform vec3 rep;                       // 周期参数
+  uniform mat4 noiseTransformMatrix;        // 4x4 变换矩阵用于计算 Noise
+  uniform mat4 positionTransformMatrix;     // 新的 4x4 变换矩阵，用于对粒子位置进行变换
+  uniform vec3 rep;                         // 周期参数
   
   void main() {
     vec2 uv = gl_FragCoord.xy / resolution.xy;
@@ -225,6 +230,9 @@ const computeFragmentShader = `
     // 从上一帧获取位置
     vec4 previousPosition = texture(position, uv);
 
+    // 获取背景点云的位置
+    vec4 backgroundPosition = texture(backgroundPosition, uv);
+    
     // 使用 noiseTransformMatrix 进行噪声计算
     vec3 transformedPosition = (noiseTransformMatrix * vec4(previousPosition.xyz, 1.0)).xyz;
     float noiseValue = pnoise(transformedPosition, rep);  // 计算噪声值，范围 [-1, 1]
@@ -235,8 +243,29 @@ const computeFragmentShader = `
     // 对 previousPosition 和 newPosition 进行线性插值，噪声值 noiseValue 作为权重
     vec3 interpolatedPosition = mix(previousPosition.xyz, newPosition, noiseValue);
 
-    // 设置新的位置为插值后的结果
-    gl_FragColor = vec4(interpolatedPosition, 1.0);
+    // 混合 interpolatedPosition 和 transformedBackgroundPosition, alpha 为 0.99
+    interpolatedPosition *= 0.9998;
+    vec3 finalPosition = mix(backgroundPosition.xyz, interpolatedPosition.xyz, 0.9998);
+
+    // 设置最终的位置
+    gl_FragColor = vec4(interpolatedPosition.xyz, 1.0);
+  }
+`;
+
+const backgroundComputeFragmentShader = `
+  uniform mat4 backgroundTransformMatrix;  // 背景点云的变换矩阵
+
+  void main() {
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    
+    // 从上一帧获取背景点云的位置
+    vec4 backgroundPosition = texture(backgroundPosition, uv);  // 获取背景点云的 4 分量位置
+
+    // 对背景点云应用背景矩阵的变换
+    vec3 transformedBackgroundPosition = (backgroundTransformMatrix * vec4(backgroundPosition.xyz, 1.0)).xyz;
+
+    // 设置新的背景点云位置
+    gl_FragColor = vec4(transformedBackgroundPosition.xyz, 1.0);
   }
 `;
 
@@ -247,40 +276,91 @@ const positionVariable = gpuCompute.addVariable(
   initialPosition
 );
 
-// 设置变量依赖关系
-gpuCompute.setVariableDependencies(positionVariable, [positionVariable]);
+// 创建背景位置的变量，并使用 backgroundComputeFragmentShader 更新它
+const backgroundPositionVariable = gpuCompute.addVariable(
+  "backgroundPosition",
+  backgroundComputeFragmentShader, // 用于更新背景点云的片段着色器
+  backgroundPosition
+);
 
-let noiseTransformationMatrix = null;
-{
+// 设置变量依赖关系，确保 positionVariable 依赖于 backgroundPositionVariable
+gpuCompute.setVariableDependencies(positionVariable, [
+  positionVariable,
+  backgroundPositionVariable,
+]);
+gpuCompute.setVariableDependencies(backgroundPositionVariable, [
+  backgroundPositionVariable,
+]);
+
+function generateTransformationMatrices() {
   // 设置噪声变换的参数
-  const rotationAngles = { x: 0, y: 0, z: 0 }; // 旋转角度（单位：度）
-  const scaleFactors = { x: 0.5, y: 0.5, z: 0.5 }; // 缩放因子
-  const translationValues = { x: 0, y: 0, z: 0 }; // 平移值
-  // 动态生成用于噪声计算的变换矩阵
-  noiseTransformationMatrix = new THREE.Matrix4().fromArray(
+  const noiseRotationAngles = { x: 2, y: 2, z: 2 }; // 旋转角度（单位：度）
+  const noiseScaleFactors = { x: 0.5, y: 0.5, z: 0.5 }; // 缩放因子
+  const noiseTranslationValues = {
+    x: getRandomInRange(-1, 1),
+    y: getRandomInRange(-1, 1),
+    z: getRandomInRange(-1, 1),
+  }; // 平移值
+
+  const noiseTransformationMatrix = new THREE.Matrix4().fromArray(
     generateTransformationMatrix(
-      rotationAngles, // 旋转角度
-      scaleFactors, // 缩放因子
-      translationValues // 平移值
+      noiseRotationAngles,
+      noiseScaleFactors,
+      noiseTranslationValues
     )
   );
+
+  // 设置位置变换的参数
+  const positionRotationAngles = {
+    x: getRandomInRange(-20, 20),
+    y: getRandomInRange(-20, 20),
+    z: getRandomInRange(-20, 20),
+  }; // 旋转角度（单位：度）
+  const positionScaleFactors = {
+    x: 1 + Math.random() / 5,
+    y: 1 + Math.random() / 5,
+    z: 1 + Math.random() / 5,
+  }; // 缩放因子
+  const positionTranslationValues = { x: 0, y: 0, z: 0 }; // 平移值
+
+  const positionTransformationMatrix = new THREE.Matrix4().fromArray(
+    generateTransformationMatrix(
+      positionRotationAngles,
+      positionScaleFactors,
+      positionTranslationValues
+    )
+  );
+
+  // 设置背景点云的变换参数
+  const backgroundRotationAngles = {
+    x: getRandomInRange(-5, 5),
+    y: getRandomInRange(-5, 5),
+    z: getRandomInRange(-5, 5),
+  }; // 旋转角度（单位：度）
+  const backgroundScaleFactors = { x: 1, y: 1, z: 1 }; // 缩放因子
+  const backgroundTranslationValues = { x: 0, y: 0, z: 0 }; // 平移值
+
+  const backgroundTransformationMatrix = new THREE.Matrix4().fromArray(
+    generateTransformationMatrix(
+      backgroundRotationAngles,
+      backgroundScaleFactors,
+      backgroundTranslationValues
+    )
+  );
+
+  // 返回三个变换矩阵
+  return {
+    noiseTransformationMatrix,
+    positionTransformationMatrix,
+    backgroundTransformationMatrix,
+  };
 }
 
-let positionTransformationMatrix = null;
-{
-  // 设置位置变换的参数
-  const rotationAngles = { x: 3, y: 3, z: 3 }; // 旋转角度（单位：度）
-  const scaleFactors = { x: 1, y: 1, z: 1 }; // 缩放因子
-  const translationValues = { x: 0, y: 0, z: 0 }; // 平移值
-  // 动态生成用于位置计算的变换矩阵
-  positionTransformationMatrix = new THREE.Matrix4().fromArray(
-    generateTransformationMatrix(
-      rotationAngles, // 旋转角度
-      scaleFactors, // 缩放因子
-      translationValues // 平移值
-    )
-  );
-}
+const {
+  noiseTransformationMatrix,
+  positionTransformationMatrix,
+  backgroundTransformationMatrix,
+} = generateTransformationMatrices();
 
 const rep = new THREE.Vector3(3.0, 3.0, 3.0); // 周期性噪声的 rep 参数
 
@@ -294,6 +374,9 @@ positionVariable.material.uniforms.positionTransformMatrix = {
   value: positionTransformationMatrix,
 };
 positionVariable.material.uniforms.rep = { value: rep };
+backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
+  value: backgroundTransformationMatrix,
+};
 
 // 检查着色器错误
 const error = gpuCompute.init();
@@ -349,7 +432,7 @@ const material = new THREE.ShaderMaterial({
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
 
     // 设置点大小
-    gl_PointSize = 2.0;
+    gl_PointSize = 1.0;
 
     // 设置最终位置
     gl_Position = projectionMatrix * mvPosition;
@@ -402,6 +485,10 @@ function animate() {
 
   // 计算下一帧的位置
   gpuCompute.compute();
+
+  const backgroundPositionTexture = gpuCompute.getCurrentRenderTarget(
+    backgroundPositionVariable
+  ).texture;
 
   // 获取计算后的纹理
   const posTexture =
