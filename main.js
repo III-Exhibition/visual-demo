@@ -1,241 +1,431 @@
 import * as THREE from "three";
-// 从 three.js 的 examples 引入 Stats
-import Stats from "three/examples/jsm/libs/stats.module.js";
-// 引入 OrbitControls
+import { GPUComputationRenderer } from "three/examples/jsm/misc/GPUComputationRenderer.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import Stats from "three/examples/jsm/libs/stats.module.js";
+import pnoise3D from "./shaders/classicnoise3D.glsl";
+import { mat4 } from "gl-matrix";
+import { FontLoader } from "three/examples/jsm/loaders/FontLoader";
+import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry";
 
-// 创建场景、相机和渲染器
+// 创建场景
 const scene = new THREE.Scene();
-// const aspect = window.innerWidth / window.innerHeight;
-// const zoomFactor = 1.5; // 初始缩放因子为 1
-// const camera = new THREE.OrthographicCamera(
-//   -aspect * zoomFactor,
-//   aspect * zoomFactor,
-//   zoomFactor,
-//   -zoomFactor,
-//   0.1,
-//   1000
-// );
+
+// 创建相机
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.1,
   1000
 );
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
+camera.position.x = 3;
+camera.position.y = 3;
+camera.position.z = 3;
+
+// 创建渲染器
+const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x000000, 0);
+renderer.setPixelRatio(window.devicePixelRatio); // 设置像素比
 document.body.appendChild(renderer.domElement);
 
-// 设置画布的背景为渐变色
-renderer.domElement.style.background = `linear-gradient(
-    to bottom,
-    rgb(237, 231, 233) 0%,
-    rgb(109, 170, 214) 15%,
-    rgb(103, 100, 120) 65%,
-    rgb(69, 60, 60) 85%,
-    rgb(20, 20, 20) 100%
-)`;
-
-// 定义球面区域的颜色
-const faceColors = {
-  "+X": [0.929412, 0.905882, 0.913725], // 浅灰粉色
-  "-X": [0.921569, 0.568627, 0.607843], // 浅珊瑚红
-  "+Y": [0.917647, 0.231373, 0.301961], // 鲜红色
-  "-Y": [0.984314, 0.486275, 0.223529], // 橙色
-  "+Z": [0.768627, 0.870588, 0.815686], // 浅青绿色
-  "-Z": [0.894118, 0.760784, 0.792157], // 浅粉红色
-};
-
-// 设置相机位置
-camera.position.z = 2;
-
-// 初始化 Stats 模块
 const stats = new Stats();
 document.body.appendChild(stats.dom);
 
-// 创建 OrbitControls 来控制相机视角
+// 创建 OrbitControls 实例
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // 添加阻尼效果（惯性），更顺滑的控制
-controls.dampingFactor = 0.05;
-controls.screenSpacePanning = false; // 不允许屏幕空间平移
-controls.minDistance = 0.01; // 最小缩放距离
-controls.maxDistance = 100; // 最大缩放距离
 
-// 生成均匀分布在球体内的粒子
-function generateParticlesInSphere(numParticles, radius) {
-  const positions = new Float32Array(numParticles * 3);
+// 可选配置
+controls.enableDamping = true; // 启用阻尼（惯性），需要在动画循环中调用 controls.update()
+controls.dampingFactor = 0.05; // 阻尼系数
 
-  for (let i = 0; i < numParticles; i++) {
-    // 生成从 -1 到 1 的均匀随机数（仅三个分量）
-    const rnd = [
-      Math.random() * 2 - 1,
-      Math.random() * 2 - 1,
-      Math.random() * 2 - 1,
-    ];
+controls.minDistance = 0.01; // 相机与目标的最小距离
+controls.maxDistance = 100; // 相机与目标的最大距离
 
-    const twoPi = 2.0 * Math.PI;
-    const theta = twoPi * rnd[0]; // 从 rnd.s 得到的随机角度
-    const phi = Math.acos(2 * rnd[1] - 1.0); // 从 rnd.t 得到的球坐标角度
-    const third = 1.0 / 3.0;
-    const randomRadius = radius * Math.pow(Math.abs(rnd[2]), third); // 使用 rnd.p 来计算均匀半径
+controls.enablePan = true; // 启用平移
+controls.enableZoom = true; // 启用缩放
 
-    // 计算点的球坐标
-    const x = Math.cos(theta) * Math.sin(phi);
-    const y = Math.sin(theta) * Math.sin(phi);
-    const z = Math.cos(phi);
+// 创建坐标轴辅助对象，长度为5
+const axesHelper = new THREE.AxesHelper(5);
+scene.add(axesHelper);
 
-    // 应用半径，得到均匀分布在球体内的点
-    positions[i * 3] = x * randomRadius;
-    positions[i * 3 + 1] = y * randomRadius;
-    positions[i * 3 + 2] = z * randomRadius;
-  }
+// 添加标尺函数
+function createRuler(axis, length, interval) {
+  const rulerGroup = new THREE.Group();
+  for (let i = -length; i <= length; i += interval) {
+    const markerGeometry = new THREE.BufferGeometry();
+    const markerVertices = [];
 
-  return positions;
-}
-
-// 计算颜色的辅助函数，非线性渐变反转，靠近球面时变为白色
-function calculateNonlinearColor(regionColor, distance, maxDistance) {
-  const white = [1.0, 1.0, 1.0]; // 白色
-  const color = [];
-
-  // 使用反转的非线性渐变，使得靠近球心时保持原始颜色，靠近球面时渐变为白色
-  const t = 1 - Math.pow(distance / maxDistance, 30); // 非线性反转
-  // t = 1 时为分区颜色，t = 0 时为白色
-
-  for (let i = 0; i < 3; i++) {
-    color[i] = white[i] + (regionColor[i] - white[i]) * t;
-  }
-
-  return color;
-}
-
-// 包装颜色设置逻辑的函数
-function assignColorsToParticles(positions, colors, numParticles, maxDistance) {
-  for (let i = 0; i < numParticles; i++) {
-    const x = positions[i * 3];
-    const y = positions[i * 3 + 1];
-    const z = positions[i * 3 + 2];
-    const distance = Math.sqrt(x * x + y * y + z * z); // 点到球心的距离
-
-    let regionColor;
-
-    // 确定粒子所在的区域
-    if (Math.abs(x) > Math.abs(y) && Math.abs(x) > Math.abs(z)) {
-      regionColor = x > 0 ? faceColors["+X"] : faceColors["-X"];
-    } else if (Math.abs(y) > Math.abs(x) && Math.abs(y) > Math.abs(z)) {
-      regionColor = y > 0 ? faceColors["+Y"] : faceColors["-Y"];
-    } else {
-      regionColor = z > 0 ? faceColors["+Z"] : faceColors["-Z"];
+    if (axis === "x") {
+      markerVertices.push(i, 0, 0, i, 0.2, 0); // 在 X 轴上创建垂直小线段
+    } else if (axis === "y") {
+      markerVertices.push(0, i, 0, 0.2, i, 0); // 在 Y 轴上创建水平小线段
+    } else if (axis === "z") {
+      markerVertices.push(0, 0, i, 0, 0.2, i); // 在 Z 轴上创建垂直小线段
     }
 
-    // 计算粒子的颜色，使用非线性渐变
-    const color = calculateNonlinearColor(regionColor, distance, maxDistance);
-
-    // 设置粒子的颜色
-    colors[i * 3] = color[0];
-    colors[i * 3 + 1] = color[1];
-    colors[i * 3 + 2] = color[2];
+    markerGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(markerVertices, 3)
+    );
+    const markerMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+    const marker = new THREE.Line(markerGeometry, markerMaterial);
+    rulerGroup.add(marker);
   }
+  return rulerGroup;
 }
 
-// 调用函数生成 100 万个粒子，半径为 1
-const numParticles = 1000000;
-const radius = 1; // 可调整的球体半径
-const positions = generateParticlesInSphere(numParticles, radius);
-const colors = new Float32Array(numParticles * 3); // 每个粒子有 R、G、B 颜色
+// 在 X, Y, Z 轴上添加标尺，长度为 5，间隔为 1
+const xRuler = createRuler("x", 5, 1);
+const yRuler = createRuler("y", 5, 1);
+const zRuler = createRuler("z", 5, 1);
 
-// 调用颜色设置函数
-assignColorsToParticles(positions, colors, numParticles, radius);
+scene.add(xRuler);
+scene.add(yRuler);
+scene.add(zRuler);
 
-// 创建顶点缓冲区
-const geometry = new THREE.BufferGeometry();
-geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3)); // 设置颜色缓冲区
+// 创建字体加载器
+const fontLoader = new FontLoader();
+// 加载字体文件
+fontLoader.load(
+  "node_modules/three/examples/fonts/helvetiker_regular.typeface.json",
+  function (font) {
+    // 创建 X、Y、Z 的字母标记
+    const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-// 创建材质，支持顶点颜色
-const material = new THREE.PointsMaterial({
-  vertexColors: true, // 开启顶点颜色
-  size: 1,
-  sizeAttenuation: false,
-  transparent: true,
-  opacity: 0.7,
-});
+    const textOptions = {
+      font: font,
+      size: 0.2,
+      depth: 0.01,
+    };
 
-// 创建粒子系统
-const particles = new THREE.Points(geometry, material);
-scene.add(particles);
+    // X 轴标记
+    const xTextGeometry = new TextGeometry("X", textOptions);
+    const xTextMesh = new THREE.Mesh(xTextGeometry, textMaterial);
+    xTextMesh.position.set(5.5, 0, 0); // 放置在 X 轴末端
+    scene.add(xTextMesh);
 
-// 渲染循环
-let lastTime = performance.now();
-// 定义旋转速度向量，以每秒的角度为单位 (角度/秒)
-const rotationSpeedPerSecond = new THREE.Vector3(1.321, 8.598, 1.444);
+    // Y 轴标记
+    const yTextGeometry = new TextGeometry("Y", textOptions);
+    const yTextMesh = new THREE.Mesh(yTextGeometry, textMaterial);
+    yTextMesh.position.set(0, 5.5, 0); // 放置在 Y 轴末端
+    scene.add(yTextMesh);
 
-// 将旋转速度从角度转换为弧度
-const rotationSpeed = rotationSpeedPerSecond.multiplyScalar(Math.PI / 180); // 统一转换为弧度
+    // Z 轴标记
+    const zTextGeometry = new TextGeometry("Z", textOptions);
+    const zTextMesh = new THREE.Mesh(zTextGeometry, textMaterial);
+    zTextMesh.position.set(0, 0, 5.5); // 放置在 Z 轴末端
+    scene.add(zTextMesh);
+  }
+);
 
-function animate() {
-  const currentTime = performance.now();
-  const deltaTime = (currentTime - lastTime) / 1000; // 计算时间差，以秒为单位
-  lastTime = currentTime;
-
-  // 根据 deltaTime 调整 x, y, z 方向的旋转
-  particles.rotation.x += rotationSpeed.x * deltaTime;
-  particles.rotation.y += rotationSpeed.y * deltaTime;
-  particles.rotation.z += rotationSpeed.z * deltaTime;
-
-  renderer.render(scene, camera);
-  // 更新 Stats
-  stats.update();
-  requestAnimationFrame(animate);
-}
-
-animate();
-
-// 响应窗口大小变化
-window.addEventListener("resize", onWindowResize, false);
-
-// function onWindowResize() {
-//   const aspect = window.innerWidth / window.innerHeight;
-//   const zoomFactor = 1.5; // 可以根据需要动态调整
-
-//   // 根据 zoomFactor 和宽高比调整正交相机的视图体积
-//   camera.left = -aspect * zoomFactor;
-//   camera.right = aspect * zoomFactor;
-//   camera.top = zoomFactor;
-//   camera.bottom = -zoomFactor;
-
-//   camera.updateProjectionMatrix();
-
-//   // 更新渲染器尺寸
-//   renderer.setSize(window.innerWidth, window.innerHeight);
-// }
-
-function onWindowResize() {
+// 处理窗口大小变化
+window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(window.devicePixelRatio); // 确保在调整大小时也设置像素比
+});
+
+// 生成旋转、缩放和平移矩阵
+function generateTransformationMatrix(
+  rotationAngles,
+  scaleFactors,
+  translationValues
+) {
+  const transformationMatrix = mat4.create();
+
+  // 旋转角度转换为弧度
+  const angleX = (rotationAngles.x * Math.PI) / 180;
+  const angleY = (rotationAngles.y * Math.PI) / 180;
+  const angleZ = (rotationAngles.z * Math.PI) / 180;
+
+  // 生成旋转矩阵
+  mat4.rotateZ(transformationMatrix, transformationMatrix, angleZ);
+  mat4.rotateY(transformationMatrix, transformationMatrix, angleY);
+  mat4.rotateX(transformationMatrix, transformationMatrix, angleX);
+
+  // 缩放
+  mat4.scale(transformationMatrix, transformationMatrix, [
+    scaleFactors.x,
+    scaleFactors.y,
+    scaleFactors.z,
+  ]);
+
+  // 平移
+  mat4.translate(transformationMatrix, transformationMatrix, [
+    translationValues.x,
+    translationValues.y,
+    translationValues.z,
+  ]);
+
+  return transformationMatrix;
 }
 
-function saveCurrentCanvasAsImage() {
-  // 确保渲染器使用透明背景
-  renderer.setClearColor(0x000000, 0); // 设置背景为透明
+// 设置纹理大小
+const size = 2048; // 纹理大小为3x3，可以容纳9个粒子
+const gpuCompute = new GPUComputationRenderer(size, size, renderer);
 
-  // 渲染当前场景
+// 检查 WebGL2 支持
+if (renderer.capabilities.isWebGL2 === false) {
+  alert("GPUComputationRenderer 需要 WebGL2 支持");
+}
+
+// 创建初始位置纹理
+const initialPosition = gpuCompute.createTexture();
+const posArray = initialPosition.image.data;
+
+// 生成球面上的随机点
+function getRandomPositionOnSphere(radius) {
+  const u = Math.random();
+  const v = Math.random();
+  const theta = 2 * Math.PI * u;
+  const phi = Math.acos(2 * v - 1);
+
+  const x = radius * Math.sin(phi) * Math.cos(theta);
+  const y = radius * Math.sin(phi) * Math.sin(theta);
+  const z = radius * Math.cos(phi);
+
+  return [x, y, z];
+}
+
+// 生成球体内部均匀分布的随机点
+function getRandomPositionInSphere(radius) {
+  const u = Math.random();
+  const v = Math.random();
+  const theta = 2 * Math.PI * u;
+  const phi = Math.acos(2 * v - 1);
+  const r = Math.cbrt(Math.random()) * radius; // 随机半径，均匀分布在球体内部
+
+  const x = r * Math.sin(phi) * Math.cos(theta);
+  const y = r * Math.sin(phi) * Math.sin(theta);
+  const z = r * Math.cos(phi);
+
+  return [x, y, z];
+}
+
+// 初始化位置数据，每个粒子的位置为球体上的随机点
+for (let i = 0; i < posArray.length; i += 4) {
+  [posArray[i], posArray[i + 1], posArray[i + 2]] =
+    getRandomPositionInSphere(1.0); // x, y, z
+  posArray[i + 3] = 1.0; // w
+}
+
+const computeFragmentShader = `
+  ${pnoise3D} // 包含 Perlin 噪声函数的 GLSL 代码
+
+  uniform float delta;
+  uniform mat4 noiseTransformMatrix;      // 4x4 变换矩阵用于计算 Noise
+  uniform mat4 positionTransformMatrix;   // 新的 4x4 变换矩阵，用于对粒子位置进行变换
+  uniform vec3 rep;                       // 周期参数
+  
+  void main() {
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    
+    // 从上一帧获取位置
+    vec4 previousPosition = texture(position, uv);
+    
+    // 使用 noiseTransformMatrix 进行噪声计算
+    vec3 transformedPosition = (noiseTransformMatrix * vec4(previousPosition.xyz, 1.0)).xyz;
+    float noiseValue = pnoise(transformedPosition, rep);
+
+    // 使用噪声更新位置
+    vec3 newPosition = previousPosition.xyz + noiseValue * delta;
+
+    // 使用 positionTransformMatrix 对位置进行进一步变换
+    newPosition = (positionTransformMatrix * vec4(newPosition, 1.0)).xyz;
+    
+    // 设置新的位置
+    gl_FragColor = vec4(newPosition, 1.0);
+  }
+`;
+
+// 添加位置变量并保存引用
+const positionVariable = gpuCompute.addVariable(
+  "position",
+  computeFragmentShader,
+  initialPosition
+);
+
+// 设置变量依赖关系
+gpuCompute.setVariableDependencies(positionVariable, [positionVariable]);
+
+let noiseTransformationMatrix = null;
+{
+  // 设置噪声变换的参数
+  const rotationAngles = { x: 0, y: 0, z: 0 }; // 旋转角度（单位：度）
+  const scaleFactors = { x: 0.5, y: 0.5, z: 0.5 }; // 缩放因子
+  const translationValues = { x: 0, y: 0, z: 0 }; // 平移值
+  // 动态生成用于噪声计算的变换矩阵
+   noiseTransformationMatrix = new THREE.Matrix4().fromArray(
+    generateTransformationMatrix(
+      rotationAngles, // 旋转角度
+      scaleFactors, // 缩放因子
+      translationValues // 平移值
+    )
+  );
+}
+
+let positionTransformationMatrix = null;
+{
+  // 设置位置变换的参数
+  const rotationAngles = { x: 1, y: 0, z: 0 }; // 旋转角度（单位：度）
+  const scaleFactors = { x: 1, y: 1, z: 1 }; // 缩放因子
+  const translationValues = { x: 0, y: 0, z: 0 }; // 平移值
+  // 动态生成用于位置计算的变换矩阵
+  positionTransformationMatrix = new THREE.Matrix4().fromArray(
+    generateTransformationMatrix(
+      rotationAngles, // 旋转角度
+      scaleFactors, // 缩放因子
+      translationValues // 平移值
+    )
+  );
+}
+
+const rep = new THREE.Vector3(3.0, 3.0, 3.0); // 周期性噪声的 rep 参数
+
+// 设置 Uniforms
+positionVariable.material.uniforms.time = { value: 0.0 };
+positionVariable.material.uniforms.delta = { value: 0.0 };
+positionVariable.material.uniforms.noiseTransformMatrix = {
+  value: noiseTransformationMatrix,
+};
+positionVariable.material.uniforms.positionTransformMatrix = {
+  value: positionTransformationMatrix,
+};
+positionVariable.material.uniforms.rep = { value: rep };
+
+// 检查着色器错误
+const error = gpuCompute.init();
+if (error !== null) {
+  console.error(error);
+}
+
+// 创建几何体，包含8个顶点
+const geometry = new THREE.BufferGeometry();
+const numParticles = size * size; // 8个粒子
+
+// 创建 vertexIndex 属性
+const vertexIndices = new Float32Array(numParticles);
+for (let i = 0; i < numParticles; i++) {
+  vertexIndices[i] = i;
+}
+geometry.setAttribute(
+  "vertexIndex",
+  new THREE.BufferAttribute(vertexIndices, 1)
+);
+
+// 创建 position 属性（仍需要，因为 THREE.Points 需要它，但值将由着色器覆盖）
+const positions = new Float32Array(numParticles * 3);
+geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+// 创建材质，使用自定义着色器
+const material = new THREE.ShaderMaterial({
+  transparent: true,
+  uniforms: {
+    positionTexture: { value: null }, // 位置纹理
+    resolution: { value: new THREE.Vector2(size, size) },
+    cameraConstant: { value: getCameraConstant(camera) },
+  },
+  vertexShader: `
+  uniform sampler2D positionTexture;
+  uniform float cameraConstant;
+  uniform vec2 resolution;
+  attribute float vertexIndex;
+  varying vec3 vColor; // 用于传递颜色到片段着色器
+
+  void main() {
+    // 计算 UV 坐标
+    float index = vertexIndex;
+    float u = (mod(index, resolution.x) + 0.5) / resolution.x;
+    float v = (floor(index / resolution.x) + 0.5) / resolution.y;
+    vec2 uv = vec2(u, v);
+
+    // 从 positionTexture 获取位置数据
+    vec4 posData = texture2D(positionTexture, uv);
+    vec3 pos = posData.xyz;
+
+    // 变换到视图空间
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+
+    // 设置点大小
+    gl_PointSize = 2.0;
+
+    // 设置最终位置
+    gl_Position = projectionMatrix * mvPosition;
+
+    // 根据 vertexIndex 计算颜色（按 index 对 8 的模依次改变颜色）
+    vec3 colors[8] = vec3[](
+      vec3(1.0, 0.0, 0.0), // 红色
+      vec3(0.0, 1.0, 0.0), // 绿色
+      vec3(0.0, 0.0, 1.0), // 蓝色
+      vec3(1.0, 1.0, 0.0), // 黄色
+      vec3(1.0, 0.0, 1.0), // 品红
+      vec3(0.0, 1.0, 1.0), // 青色
+      vec3(1.0, 0.5, 0.0), // 橙色
+      vec3(0.5, 0.5, 0.5)  // 灰色
+    );
+    vColor = colors[int(mod(index, 8.0))];
+  }
+`,
+  fragmentShader: `
+  varying vec3 vColor; // 接收来自顶点着色器的颜色
+
+  void main() {
+      gl_FragColor = vec4(1.0, 1.0, 1.0, 0.7); // 使用传递的颜色
+  }
+`,
+});
+
+// 创建点
+const points = new THREE.Points(geometry, material);
+scene.add(points);
+
+// 辅助函数：计算相机常数
+function getCameraConstant(camera) {
+  return (
+    window.innerHeight /
+    (Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * 2)
+  );
+}
+
+// 动画循环
+const clock = new THREE.Clock();
+
+function animate() {
+  const delta = clock.getDelta();
+  const elapsedTime = clock.elapsedTime;
+
+  // 更新计算器的 Uniforms
+  positionVariable.material.uniforms.time.value = elapsedTime;
+  positionVariable.material.uniforms.delta.value = delta;
+
+  // 计算下一帧的位置
+  gpuCompute.compute();
+
+  // 获取计算后的纹理
+  const posTexture =
+    gpuCompute.getCurrentRenderTarget(positionVariable).texture;
+
+  // 更新材质的 Uniform
+  material.uniforms.positionTexture.value = posTexture;
+
+  // 更新 OrbitControls
+  controls.update();
+  stats.update();
   renderer.render(scene, camera);
 
-  // 将渲染的结果转换为图片数据URL
-  const imgData = renderer.domElement.toDataURL("image/png");
-
-  // 创建一个链接并触发下载
-  const link = document.createElement("a");
-  link.href = imgData;
-  link.download = "rendered_scene.png";
-  link.click();
+  requestAnimationFrame(animate);
 }
 
-// 调用函数保存当前渲染画布
-// saveCurrentCanvasAsImage();
+// // 添加一个透明的正方体作为参考
+// const cubeGeometry = new THREE.BoxGeometry(4, 4, 4);
+// const cubeMaterial = new THREE.MeshBasicMaterial({
+//   color: 0xffffff,
+//   wireframe: true,
+//   transparent: true,
+//   opacity: 0.3
+// });
+// const referenceCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+// scene.add(referenceCube);
+
+animate();
