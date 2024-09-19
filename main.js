@@ -25,7 +25,40 @@ camera.position.z = 2.5;
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio); // 设置像素比
+renderer.setClearColor(0x000000, 0);
 document.body.appendChild(renderer.domElement);
+
+// 设置画布的背景为渐变色
+renderer.domElement.style.background = `linear-gradient(
+  to bottom,
+  rgb(237, 231, 233) 0%,
+  rgb(109, 170, 214) 15%,
+  rgb(103, 100, 120) 65%,
+  rgb(69, 60, 60) 85%,
+  rgb(20, 20, 20) 100%
+)`;
+
+// 定义球面区域的颜色
+const faceColors = {
+  "+X": [0.929412, 0.905882, 0.913725], // 浅灰粉色
+  "-X": [0.921569, 0.568627, 0.607843], // 浅珊瑚红
+  "+Y": [0.917647, 0.231373, 0.301961], // 鲜红色
+  "-Y": [0.984314, 0.486275, 0.223529], // 橙色
+  "+Z": [0.768627, 0.870588, 0.815686], // 浅青绿色
+  "-Z": [0.894118, 0.760784, 0.792157], // 浅粉红色
+};
+
+
+// 根据顶点的空间位置确定其所在的区域
+function getColorByPosition(x, y, z) {
+  if (Math.abs(x) >= Math.abs(y) && Math.abs(x) >= Math.abs(z)) {
+    return x >= 0 ? faceColors["+X"] : faceColors["-X"];
+  } else if (Math.abs(y) >= Math.abs(x) && Math.abs(y) >= Math.abs(z)) {
+    return y >= 0 ? faceColors["+Y"] : faceColors["-Y"];
+  } else {
+    return z >= 0 ? faceColors["+Z"] : faceColors["-Z"];
+  }
+}
 
 const stats = new Stats();
 document.body.appendChild(stats.dom);
@@ -162,6 +195,7 @@ function generateTransformationMatrix(
 
 // 设置纹理大小
 const size = 2048; // 纹理大小为3x3，可以容纳9个粒子
+const radius = 1.0; // 球体半径
 const gpuCompute = new GPUComputationRenderer(size, size, renderer);
 
 // 检查 WebGL2 支持
@@ -209,7 +243,7 @@ const posArray = initialPosition.image.data;
 // 初始化位置数据，每个粒子的位置为球体上的随机点
 for (let i = 0; i < posArray.length; i += 4) {
   [posArray[i], posArray[i + 1], posArray[i + 2]] =
-    getRandomPositionInSphere(1.0); // x, y, z
+    getRandomPositionInSphere(radius); // x, y, z
   posArray[i + 3] = 1.0; // w
 }
 
@@ -248,7 +282,7 @@ const computeFragmentShader = `
     vec3 finalPosition = mix(backgroundPosition.xyz, interpolatedPosition.xyz, 0.9998);
 
     // 设置最终的位置
-    gl_FragColor = vec4(interpolatedPosition.xyz, 1.0);
+    gl_FragColor = vec4(finalPosition.xyz, 1.0);
   }
 `;
 
@@ -373,10 +407,10 @@ positionVariable.material.uniforms.noiseTransformMatrix = {
 positionVariable.material.uniforms.positionTransformMatrix = {
   value: positionTransformationMatrix,
 };
-positionVariable.material.uniforms.rep = { value: rep };
 backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
   value: backgroundTransformationMatrix,
 };
+positionVariable.material.uniforms.rep = { value: rep };
 
 // 检查着色器错误
 const error = gpuCompute.init();
@@ -387,6 +421,16 @@ if (error !== null) {
 // 创建几何体，包含8个顶点
 const geometry = new THREE.BufferGeometry();
 const numParticles = size * size; // 8个粒子
+const colors = []; // 每个粒子有 R、G、B 颜色
+
+// 生成球面上的粒子并为每个粒子赋予不同的颜色
+for (let i = 0; i < numParticles; i++) {
+  const [x, y, z] = posArray.slice(i * 4, i * 4 + 3); // 获取位置
+
+  // 根据位置获取颜色
+  const color = getColorByPosition(x, y, z);
+  colors.push(...color);
+}
 
 // 创建 vertexIndex 属性
 const vertexIndices = new Float32Array(numParticles);
@@ -401,6 +445,7 @@ geometry.setAttribute(
 // 创建 position 属性（仍需要，因为 THREE.Points 需要它，但值将由着色器覆盖）
 const positions = new Float32Array(numParticles * 3);
 geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
 
 // 创建材质，使用自定义着色器
 const material = new THREE.ShaderMaterial({
@@ -415,6 +460,7 @@ const material = new THREE.ShaderMaterial({
   uniform float cameraConstant;
   uniform vec2 resolution;
   attribute float vertexIndex;
+  attribute vec3 color;
   varying vec3 vColor; // 用于传递颜色到片段着色器
 
   void main() {
@@ -437,25 +483,16 @@ const material = new THREE.ShaderMaterial({
     // 设置最终位置
     gl_Position = projectionMatrix * mvPosition;
 
-    // 根据 vertexIndex 计算颜色（按 index 对 8 的模依次改变颜色）
-    vec3 colors[8] = vec3[](
-      vec3(1.0, 0.0, 0.0), // 红色
-      vec3(0.0, 1.0, 0.0), // 绿色
-      vec3(0.0, 0.0, 1.0), // 蓝色
-      vec3(1.0, 1.0, 0.0), // 黄色
-      vec3(1.0, 0.0, 1.0), // 品红
-      vec3(0.0, 1.0, 1.0), // 青色
-      vec3(1.0, 0.5, 0.0), // 橙色
-      vec3(0.5, 0.5, 0.5)  // 灰色
-    );
-    vColor = colors[int(mod(index, 8.0))];
+    vColor = color;
   }
 `,
   fragmentShader: `
   varying vec3 vColor; // 接收来自顶点着色器的颜色
 
   void main() {
-      gl_FragColor = vec4(1.0, 1.0, 1.0, 0.7); // 使用传递的颜色
+      // 伽马校正
+      vec3 gammaCorrectedColor = pow(vColor, vec3(1.0 / 2.2)); 
+      gl_FragColor = vec4(gammaCorrectedColor, 0.6); // 使用传递的颜色
   }
 `,
 });
