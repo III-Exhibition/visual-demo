@@ -278,8 +278,7 @@ const computeFragmentShader = `
     vec3 interpolatedPosition = mix(previousPosition.xyz, newPosition, noiseValue);
 
     // 混合 interpolatedPosition 和 transformedBackgroundPosition, alpha 为 0.99
-    interpolatedPosition *= 0.9996;
-    vec3 finalPosition = mix(backgroundPosition.xyz, interpolatedPosition.xyz, 0.9996);
+    vec3 finalPosition = mix(backgroundPosition.xyz, interpolatedPosition.xyz, 0.99);
 
     // 设置最终的位置
     gl_FragColor = vec4(finalPosition.xyz, 1.0);
@@ -328,12 +327,12 @@ gpuCompute.setVariableDependencies(backgroundPositionVariable, [
 
 function generateTransformationMatrices(elapsedTime) {
   // 设置噪声变换的参数
-  const noiseRotationAngles = { x: 2, y: 2, z: 2 }; // 旋转角度（单位：度）
+  const noiseRotationAngles = { x: 0, y: 0, z: 0 }; // 旋转角度（单位：度）
   const noiseScaleFactors = { x: 0.5, y: 0.5, z: 0.5 }; // 缩放因子
   const noiseTranslationValues = {
-    x: elapsedTime * getRandomInRange(-1, 1),
-    y: elapsedTime * getRandomInRange(-1, 1),
-    z: elapsedTime * getRandomInRange(-1, 1),
+    x: 0,
+    y: 0,
+    z: 0,
   }; // 平移值
 
   const noiseTransformationMatrix = new THREE.Matrix4().fromArray(
@@ -346,14 +345,14 @@ function generateTransformationMatrices(elapsedTime) {
 
   // 设置位置变换的参数
   const positionRotationAngles = {
-    x: getRandomInRange(-20, 20),
-    y: getRandomInRange(-20, 20),
-    z: getRandomInRange(-20, 20),
+    x: 0,
+    y: 0,
+    z: 0,
   }; // 旋转角度（单位：度）
   const positionScaleFactors = {
-    x: 1 + Math.random() / 5,
-    y: 1 + Math.random() / 5,
-    z: 1 + Math.random() / 5,
+    x: 1,
+    y: 1,
+    z: 1,
   }; // 缩放因子
   const positionTranslationValues = { x: 0, y: 0, z: 0 }; // 平移值
 
@@ -367,9 +366,9 @@ function generateTransformationMatrices(elapsedTime) {
 
   // 设置背景点云的变换参数
   const backgroundRotationAngles = {
-    x: getRandomInRange(-5, 5),
-    y: getRandomInRange(-5, 5),
-    z: getRandomInRange(-5, 5),
+    x: 0,
+    y: 0,
+    z: 0,
   }; // 旋转角度（单位：度）
   const backgroundScaleFactors = { x: 1, y: 1, z: 1 }; // 缩放因子
   const backgroundTranslationValues = { x: 0, y: 0, z: 0 }; // 平移值
@@ -521,42 +520,42 @@ function animate() {
   elapsedTime += delta;
 
   // 当累计时间超过设定的间隔时调用函数
-  if (elapsedTime >= interval) {
-    const runningTime = clock.getElapsedTime()
-    const {
-      noiseTransformationMatrix,
-      positionTransformationMatrix,
-      backgroundTransformationMatrix,
-    } = generateTransformationMatrices(runningTime);
-    const rep = new THREE.Vector3(3.0, 3.0, 3.0); // 周期性噪声的 rep 参数
+  // if (elapsedTime >= interval) {
+  //   const runningTime = clock.getElapsedTime()
+  //   const {
+  //     noiseTransformationMatrix,
+  //     positionTransformationMatrix,
+  //     backgroundTransformationMatrix,
+  //   } = generateTransformationMatrices(runningTime);
+  //   const rep = new THREE.Vector3(3.0, 3.0, 3.0); // 周期性噪声的 rep 参数
 
-    console.log("Updating transformation matrices");
-    console.log("Noise transformation matrix:");
-    console.log(noiseTransformationMatrix);
-    console.log("Position transformation matrix:");
-    console.log(positionTransformationMatrix);
-    console.log("Background transformation matrix:");
-    console.log(backgroundTransformationMatrix);
-    console.log("Rep:");
-    console.log(rep);
-    console.log("Elapsed time:");
-    console.log(runningTime);
+  //   console.log("Updating transformation matrices");
+  //   console.log("Noise transformation matrix:");
+  //   console.log(noiseTransformationMatrix);
+  //   console.log("Position transformation matrix:");
+  //   console.log(positionTransformationMatrix);
+  //   console.log("Background transformation matrix:");
+  //   console.log(backgroundTransformationMatrix);
+  //   console.log("Rep:");
+  //   console.log(rep);
+  //   console.log("Elapsed time:");
+  //   console.log(runningTime);
 
-    // 设置 Uniforms
-    positionVariable.material.uniforms.time = { value: 0.0 };
-    positionVariable.material.uniforms.delta = { value: 0.0 };
-    positionVariable.material.uniforms.noiseTransformMatrix = {
-      value: noiseTransformationMatrix,
-    };
-    positionVariable.material.uniforms.positionTransformMatrix = {
-      value: positionTransformationMatrix,
-    };
-    backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
-      value: backgroundTransformationMatrix,
-    };
-    positionVariable.material.uniforms.rep = { value: rep };
-    elapsedTime = 0; // 重置累计时间
-  }
+  //   // 设置 Uniforms
+  //   positionVariable.material.uniforms.time = { value: 0.0 };
+  //   positionVariable.material.uniforms.delta = { value: 0.0 };
+  //   positionVariable.material.uniforms.noiseTransformMatrix = {
+  //     value: noiseTransformationMatrix,
+  //   };
+  //   positionVariable.material.uniforms.positionTransformMatrix = {
+  //     value: positionTransformationMatrix,
+  //   };
+  //   backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
+  //     value: backgroundTransformationMatrix,
+  //   };
+  //   positionVariable.material.uniforms.rep = { value: rep };
+  //   elapsedTime = 0; // 重置累计时间
+  // }
 
   // 计算下一帧的位置
   gpuCompute.compute();
