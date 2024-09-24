@@ -37,11 +37,11 @@ export function initGUI(renderer) {
       const link = document.createElement("a");
       link.href = imgData;
       const date = new Date();
-      const [ month, day, minute, second ] = [
-        (date.getMonth() + 1).toString().padStart(2, '0'), // 将月份转换为两位数
-        date.getDate().toString().padStart(2, '0'), // 将日期转换为两位数
-        date.getMinutes().toString().padStart(2, '0'), // 将分钟转换为两位数
-        date.getSeconds().toString().padStart(2, '0') // 将秒数转换为两位数
+      const [month, day, minute, second] = [
+        (date.getMonth() + 1).toString().padStart(2, "0"), // 将月份转换为两位数
+        date.getDate().toString().padStart(2, "0"), // 将日期转换为两位数
+        date.getMinutes().toString().padStart(2, "0"), // 将分钟转换为两位数
+        date.getSeconds().toString().padStart(2, "0"), // 将秒数转换为两位数
       ];
       link.download = `particle-${month}${day}${minute}${second}.png`;
       link.click();
@@ -55,11 +55,9 @@ export function initGUI(renderer) {
 
   const noisePara = gui.addFolder("perling noise parameters");
   noisePara.add(params.noiseParams, "seed", 0, 300, 1);
-  noisePara.add(params.noiseParams, "repX", 1, 10, 1);
-  noisePara.add(params, "seed", 0, 300, 1);
-  noisePara.add(params, "periodX", 1, 10, 1);
-  noisePara.add(params, "periodY", 1, 10, 1);
-  noisePara.add(params, "periodZ", 1, 10, 1);
+  noisePara.add(params.noiseParams, "periodX", 1, 10, 1);
+  noisePara.add(params.noiseParams, "periodY", 1, 10, 1);
+  noisePara.add(params.noiseParams, "periodZ", 1, 10, 1);
   // 使用通用函数来创建矩阵控制
   addMatrixControls(
     gui,
@@ -72,41 +70,39 @@ export function initGUI(renderer) {
     "position transformation matrix",
     params.positionMatrix
   );
+  // 在 lil-gui 中添加按钮
+  gui.add(params, "saveScreenshot").name("Save PNG");
   return params;
-  // }
+}
 
-  // 通用的函数，用于创建矩阵相关的 GUI 控件
-  function addMatrixControls(gui, folderName, matrixParams) {
-    const folder = gui.addFolder(folderName);
+// 通用的函数，用于创建矩阵相关的 GUI 控件
+function addMatrixControls(gui, folderName, matrixParams) {
+  const folder = gui.addFolder(folderName);
 
-    folder
-      .add(matrixParams.rotationAngles, "x", -30, 30, 0.00001)
-      .name("rotationX");
-    folder
-      .add(matrixParams.rotationAngles, "y", -30, 30, 0.00001)
-      .name("rotationY");
-    folder
-      .add(matrixParams.rotationAngles, "z", -30, 30, 0.00001)
-      .name("rotationZ");
+  folder
+    .add(matrixParams.rotationAngles, "x", -30, 30, 0.00001)
+    .name("rotationX");
+  folder
+    .add(matrixParams.rotationAngles, "y", -30, 30, 0.00001)
+    .name("rotationY");
+  folder
+    .add(matrixParams.rotationAngles, "z", -30, 30, 0.00001)
+    .name("rotationZ");
 
-    folder.add(matrixParams.scaleFactors, "x", 0.5, 1.5, 0.01).name("scaleX");
-    folder.add(matrixParams.scaleFactors, "y", 0.5, 1.5, 0.01).name("scaleY");
-    folder.add(matrixParams.scaleFactors, "z", 0.5, 1.5, 0.01).name("scaleZ");
+  folder.add(matrixParams.scaleFactors, "x", 0.5, 1.5, 0.01).name("scaleX");
+  folder.add(matrixParams.scaleFactors, "y", 0.5, 1.5, 0.01).name("scaleY");
+  folder.add(matrixParams.scaleFactors, "z", 0.5, 1.5, 0.01).name("scaleZ");
 
-    folder
-      .add(matrixParams.translationValues, "x", -1, 1, 0.01)
-      .name("translationX");
-    folder
-      .add(matrixParams.translationValues, "y", -1, 1, 0.01)
-      .name("translationY")
-      .listen();
-    folder
-      .add(matrixParams.translationValues, "z", -1, 1, 0.01)
-      .name("translationZ");
+  folder
+    .add(matrixParams.translationValues, "x", -1, 1, 0.01)
+    .name("translationX");
+  folder
+    .add(matrixParams.translationValues, "y", -1, 1, 0.01)
+    .name("translationY")
+    .listen();
+  folder
+    .add(matrixParams.translationValues, "z", -1, 1, 0.01)
+    .name("translationZ");
 
-    // 在 lil-gui 中添加按钮
-    gui.add(params, "saveScreenshot").name("Save PNG");
-
-    return folder;
-  }
+  return folder;
 }
