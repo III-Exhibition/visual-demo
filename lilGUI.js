@@ -3,6 +3,8 @@ import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
 export function initGUI(renderer) {
   const gui = new GUI();
   const params = {
+    isPaused: false,
+    renderOneFrame: () => {},
     particleParams: {
       pointSize: 1.0,
       transparent: 0.7,
@@ -43,10 +45,23 @@ export function initGUI(renderer) {
         date.getMinutes().toString().padStart(2, "0"), // 将分钟转换为两位数
         date.getSeconds().toString().padStart(2, "0"), // 将秒数转换为两位数
       ];
-      link.download = `particle-${month}${day}${minute}${second}.png`;
+      const fileName = `particle-${month}${day}${minute}${second}`;
+      link.download = `${fileName}.png`;
       link.click();
+
+      // 保存 params 为 JSON 文件
+      const jsonLink = document.createElement("a");
+      const jsonData = new Blob([JSON.stringify(params, null, 2)], { type: "application/json" });
+      jsonLink.href = URL.createObjectURL(jsonData);
+      jsonLink.download = `${fileName}.json`;
+      jsonLink.click();
     },
   };
+
+  gui.add(params, 'isPaused').name('Pause/Resume').onChange((value) => {
+    params.isPaused = value;
+  });
+  // gui.add(params, 'renderOneFrame').name('Render One Frame > ').listen().disable(!params.isPaused);
 
   const pointPara = gui.addFolder("point parameters");
   pointPara.add(params.particleParams, "pointSize", 0.1, 10, 0.1);
