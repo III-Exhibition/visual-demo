@@ -13,7 +13,7 @@ export function initScene() {
   );
   // camera.position.x = 1;
   // camera.position.y = 1;
-  camera.position.z = 2;
+  camera.position.z = 1;
 
   // 创建渲染器
   const renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true});

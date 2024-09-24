@@ -49,18 +49,25 @@ export function initGUI(renderer) {
       link.download = `${fileName}.png`;
       link.click();
 
-      // 保存 params 为 JSON 文件
-      const jsonLink = document.createElement("a");
-      const jsonData = new Blob([JSON.stringify(params, null, 2)], { type: "application/json" });
-      jsonLink.href = URL.createObjectURL(jsonData);
-      jsonLink.download = `${fileName}.json`;
-      jsonLink.click();
+      setTimeout(function () {
+        // 保存 params 为 JSON 文件
+        const jsonLink = document.createElement("a");
+        const jsonData = new Blob([JSON.stringify(params, null, 2)], {
+          type: "application/json",
+        });
+        jsonLink.href = URL.createObjectURL(jsonData);
+        jsonLink.download = `${fileName}.json`;
+        jsonLink.click();
+      }, 3000);
     },
   };
 
-  gui.add(params, 'isPaused').name('Pause/Resume').onChange((value) => {
-    params.isPaused = value;
-  });
+  gui
+    .add(params, "isPaused")
+    .name("Pause/Resume")
+    .onChange((value) => {
+      params.isPaused = value;
+    });
   // gui.add(params, 'renderOneFrame').name('Render One Frame > ').listen().disable(!params.isPaused);
 
   const pointPara = gui.addFolder("point parameters");
