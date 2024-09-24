@@ -5,7 +5,7 @@ import {
   initStats,
   initAxes,
   initRuler,
-  initText,
+  initCaption,
 } from "./controls.js";
 import { initSpherePoints } from "./geometry.js";
 import { initGPUComputationRenderer } from "./gpgpu.js";
@@ -16,9 +16,9 @@ const { scene, camera, renderer } = initScene();
 
 const controls = initControls(camera, renderer);
 const stats = initStats();
-initAxes(scene);
-initRuler(scene);
-initText(scene);
+// initAxes(scene);
+// initRuler(scene);
+// initCaption(scene);
 
 // 设置纹理大小
 const size = 1024;
@@ -60,6 +60,7 @@ function animate() {
       value: positionTransformationMatrix,
     };
     positionVariable.material.uniforms.rep = { value: rep };
+    positionVariable.material.uniforms.seed = { value: 159.0 };
     backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
       value: backgroundTransformationMatrix,
     };

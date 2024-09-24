@@ -43,7 +43,7 @@ export function initRuler(scene) {
   scene.add(zRuler);
 }
 
-export function initText(scene) {
+export function initCaption(scene) {
   // 创建字体加载器
   const fontLoader = new FontLoader();
   // 加载字体文件

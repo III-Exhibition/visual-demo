@@ -1,4 +1,4 @@
-import pnoise3D from "./shaders/classicnoise3D.glsl";
+import pnoise3D from "./shaders/classicnoise3D.vert";
 
 export const computeFragmentShader = `
   ${pnoise3D} // 包含 Perlin 噪声函数的 GLSL 代码
@@ -6,6 +6,7 @@ export const computeFragmentShader = `
   uniform mat4 noiseTransformMatrix;        // 4x4 变换矩阵用于计算 Noise
   uniform mat4 positionTransformMatrix;     // 新的 4x4 变换矩阵，用于对粒子位置进行变换
   uniform vec3 rep;                         // 周期参数
+  uniform float seed;                         // 周期参数
   
   void main() {
     vec2 uv = gl_FragCoord.xy / resolution.xy;
@@ -18,7 +19,7 @@ export const computeFragmentShader = `
     
     // 使用 noiseTransformMatrix 进行噪声计算
     vec3 transformedPosition = (noiseTransformMatrix * vec4(previousPosition.xyz, 1.0)).xyz;
-    float noiseValue = pnoise(transformedPosition, rep);  // 计算噪声值，范围 [-1, 1]
+    float noiseValue = pnoise(transformedPosition, rep, seed);  // 计算噪声值，范围 [-1, 1]
 
     // 使用 positionTransformMatrix 对 previousPosition 进行位置变换
     vec3 newPosition = (positionTransformMatrix * vec4(previousPosition.xyz, 1.0)).xyz;

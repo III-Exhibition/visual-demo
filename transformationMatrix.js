@@ -57,8 +57,6 @@ export function generateTransformationMatrices(elapsedTime) {
     )
   );
 
-  console.log(noiseTranslationValues);
-
   // 返回三个变换矩阵
   return {
     noiseTransformationMatrix,
