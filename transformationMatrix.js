@@ -7,7 +7,7 @@ export function generateTransformationMatrices(elapsedTime) {
   const noiseScaleFactors = { x: 0.5, y: 0.5, z: 0.5 }; // 缩放因子
   const noiseTranslationValues = {
     x: 0,
-    y: elapsedTime,
+    y: elapsedTime * 0.08,
     z: 0,
   }; // 平移值
 
