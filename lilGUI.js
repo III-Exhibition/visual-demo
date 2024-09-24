@@ -1,6 +1,6 @@
 import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
 
-export function initGUI() {
+export function initGUI(renderer) {
   const gui = new GUI();
   const params = {
     seed: Math.floor(Math.random() * 300),
@@ -21,6 +21,23 @@ export function initGUI() {
       rotationAngles: { x: -3.526632, y: -6.152985, z: 23.03788 },
       scaleFactors: { x: 1.099204, y: 1.123625, z: 1.087077 },
       translationValues: { x: 0, y: 0, z: 0 },
+    },
+    saveScreenshot: function () {
+      // 获取渲染器的画布内容并转换为 data URL
+      const imgData = renderer.domElement.toDataURL("image/png");
+
+      // 创建一个临时的 <a> 标签，用于下载图片
+      const link = document.createElement("a");
+      link.href = imgData;
+      const date = new Date();
+      const [ month, day, minute, second ] = [
+        (date.getMonth() + 1).toString().padStart(2, '0'), // 将月份转换为两位数
+        date.getDate().toString().padStart(2, '0'), // 将日期转换为两位数
+        date.getMinutes().toString().padStart(2, '0'), // 将分钟转换为两位数
+        date.getSeconds().toString().padStart(2, '0') // 将秒数转换为两位数
+      ];
+      link.download = `particle-${month}${day}${minute}${second}.png`;
+      link.click();
     },
   };
 
@@ -72,6 +89,9 @@ export function initGUI() {
     folder
       .add(matrixParams.translationValues, "z", -1, 1, 0.01)
       .name("translationZ");
+
+    // 在 lil-gui 中添加按钮
+    gui.add(params, "saveScreenshot").name("Save PNG");
 
     return folder;
   }

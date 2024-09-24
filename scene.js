@@ -16,7 +16,7 @@ export function initScene() {
   camera.position.z = 2;
 
   // 创建渲染器
-  const renderer = new THREE.WebGLRenderer();
+  const renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true});
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio); // 设置像素比
   renderer.setClearColor(0x000000, 0);

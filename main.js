@@ -13,9 +13,9 @@ import { initParticle } from "./particle.js";
 import { generateTransformationMatrices } from "./transformationMatrix.js";
 import { initGUI } from "./lilGUI.js";
 
-const params = initGUI();
-
 const { scene, camera, renderer } = initScene();
+
+const params = initGUI(renderer);
 
 const controls = initControls(camera, renderer);
 const stats = initStats();
