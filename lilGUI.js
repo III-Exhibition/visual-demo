@@ -3,10 +3,17 @@ import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
 export function initGUI(renderer) {
   const gui = new GUI();
   const params = {
-    seed: Math.floor(Math.random() * 300),
-    repX: 3.0,
-    repY: 3.0,
-    repZ: 3.0,
+    particleParams: {
+      pointSize: 1.0,
+      transparent: 0.7,
+      useColor: true,
+    },
+    noiseParams: {
+      seed: Math.floor(Math.random() * 300),
+      periodX: 3.0,
+      periodY: 3.0,
+      periodZ: 3.0,
+    },
     noiseMatrix: {
       rotationAngles: { x: 0, y: 0, z: 0 },
       scaleFactors: { x: 0.5, y: 0.5, z: 0.5 },
@@ -41,11 +48,18 @@ export function initGUI(renderer) {
     },
   };
 
+  const pointPara = gui.addFolder("point parameters");
+  pointPara.add(params.particleParams, "pointSize", 0.1, 10, 0.1);
+  pointPara.add(params.particleParams, "transparent", 0, 1, 0.01);
+  pointPara.add(params.particleParams, "useColor");
+
   const noisePara = gui.addFolder("perling noise parameters");
+  noisePara.add(params.noiseParams, "seed", 0, 300, 1);
+  noisePara.add(params.noiseParams, "repX", 1, 10, 1);
   noisePara.add(params, "seed", 0, 300, 1);
-  noisePara.add(params, "repX", 1, 10, 1);
-  noisePara.add(params, "repY", 1, 10, 1);
-  noisePara.add(params, "repZ", 1, 10, 1);
+  noisePara.add(params, "periodX", 1, 10, 1);
+  noisePara.add(params, "periodY", 1, 10, 1);
+  noisePara.add(params, "periodZ", 1, 10, 1);
   // 使用通用函数来创建矩阵控制
   addMatrixControls(
     gui,

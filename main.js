@@ -25,7 +25,7 @@ const stats = initStats();
 
 // 设置纹理大小
 const size = 1024;
-const radius = 1;
+const radius = 0.7;
 // 初始化球体上的点
 initSpherePoints(size * size, radius);
 
@@ -60,7 +60,11 @@ function animate() {
       params.positionMatrix,
       deltaTime
     );
-    const rep = new THREE.Vector3(params.repX, params.repY, params.repZ); // 周期性噪声的 rep 参数
+    const rep = new THREE.Vector3(
+      params.noiseParams.periodX,
+      params.noiseParams.periodY,
+      params.noiseParams.periodZ
+    );
 
     // 设置 Uniforms
     positionVariable.material.uniforms.noiseTransformMatrix = {
@@ -70,7 +74,9 @@ function animate() {
       value: positionTransformationMatrix,
     };
     positionVariable.material.uniforms.rep = { value: rep };
-    positionVariable.material.uniforms.seed = { value: params.seed };
+    positionVariable.material.uniforms.seed = {
+      value: params.noiseParams.seed,
+    };
     backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
       value: backgroundTransformationMatrix,
     };
@@ -88,6 +94,10 @@ function animate() {
 
     // 更新材质的 Uniform
     points.material.uniforms.positionTexture.value = posTexture;
+    points.material.uniforms.pointSize.value = params.particleParams.pointSize;
+    points.material.uniforms.transparent.value =
+      params.particleParams.transparent;
+    points.material.uniforms.useColor.value = params.particleParams.useColor;
 
     // 更新 OrbitControls
     controls.update();

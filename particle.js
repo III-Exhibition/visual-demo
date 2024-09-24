@@ -28,6 +28,9 @@ export function initParticle(size) {
     uniforms: {
       positionTexture: { value: null }, // 位置纹理
       resolution: { value: new THREE.Vector2(size, size) },
+      pointSize: { value: 1.0 },
+      transparent: { value: 0.7 },
+      useColor: { value: true },
     },
     vertexShader: vertexShader,
     fragmentShader: fragmentShader,
