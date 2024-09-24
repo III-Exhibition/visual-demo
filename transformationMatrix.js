@@ -1,63 +1,39 @@
 import * as THREE from "three";
 import { mat4 } from "gl-matrix";
 
-export function generateTransformationMatrices(elapsedTime) {
-  // 设置噪声变换的参数
-  const noiseRotationAngles = { x: 0, y: 0, z: 0 }; // 旋转角度（单位：度）
-  const noiseScaleFactors = { x: 0.5, y: 0.5, z: 0.5 }; // 缩放因子
-  const noiseTranslationValues = {
-    x: 0,
-    y: elapsedTime * 0.08,
-    z: 0,
-  }; // 平移值
+export function generateTransformationMatrices(
+  backgroundMatrix,
+  noiseMatrix,
+  positionMatrix,
+  deltaTime
+) {
+  // Helper function to validate matrix properties
+  function validateMatrix(matrix) {
+    if (!matrix.rotationAngles || !matrix.scaleFactors || !matrix.translationValues) {
+      throw new Error("Matrix must have rotationAngles, scaleFactors, and translationValues properties");
+    }
+  }
 
+  // Validate input matrices
+  [backgroundMatrix, noiseMatrix, positionMatrix].forEach(validateMatrix);
+
+  // Convert backgroundMatrix to per-frame transformation
+  const backgroundMatrixPerFrame = convertToPerFrame(backgroundMatrix, deltaTime);
+
+  // Generate transformation matrices
   const noiseTransformationMatrix = new THREE.Matrix4().fromArray(
-    generateTransformationMatrix(
-      noiseRotationAngles,
-      noiseScaleFactors,
-      noiseTranslationValues
-    )
+    generateTransformationMatrix(noiseMatrix)
   );
-
-  // 设置位置变换的参数
-  const positionRotationAngles = {
-    x: -3.526632,
-    y: -6.152985,
-    z: 23.03788,
-  }; // 旋转角度（单位：度）
-  const positionScaleFactors = {
-    x: 1.099204,
-    y: 1.123625,
-    z: 1.087077,
-  }; // 缩放因子
-  const positionTranslationValues = { x: 0, y: 0, z: 0 }; // 平移值
 
   const positionTransformationMatrix = new THREE.Matrix4().fromArray(
-    generateTransformationMatrix(
-      positionRotationAngles,
-      positionScaleFactors,
-      positionTranslationValues
-    )
+    generateTransformationMatrix(positionMatrix)
   );
-
-  // 设置背景点云的变换参数
-  const backgroundRotationAngles = {
-    x: 1.959 / 60,
-    y: 3.418 / 60,
-    z: 12.8 / 60,
-  }; // 旋转角度（单位：度）
-  const backgroundScaleFactors = { x: 1, y: 1, z: 1 }; // 缩放因子
-  const backgroundTranslationValues = { x: 0, y: 0, z: 0 }; // 平移值
 
   const backgroundTransformationMatrix = new THREE.Matrix4().fromArray(
-    generateTransformationMatrix(
-      backgroundRotationAngles,
-      backgroundScaleFactors,
-      backgroundTranslationValues
-    )
+    generateTransformationMatrix(backgroundMatrixPerFrame)
   );
 
-  // 返回三个变换矩阵
+  // Return the three transformation matrices
   return {
     noiseTransformationMatrix,
     positionTransformationMatrix,
@@ -65,32 +41,62 @@ export function generateTransformationMatrices(elapsedTime) {
   };
 }
 
-// 生成旋转、缩放和平移矩阵
-function generateTransformationMatrix(
-  rotationAngles,
-  scaleFactors,
-  translationValues
-) {
+// Convert matrix to per-frame transformation based on deltaTime
+function convertToPerFrame(matrix, deltaTime) {
+  const { rotationAngles, scaleFactors, translationValues } = matrix;
+
+  // Calculate the ratio of deltaTime to one second (1000 ms)
+  const timeRatio = deltaTime / 1000;
+
+  // Convert each property to per-frame values based on timeRatio
+  const perFrameRotationAngles = {
+    x: rotationAngles.x * timeRatio,
+    y: rotationAngles.y * timeRatio,
+    z: rotationAngles.z * timeRatio,
+  };
+
+  const perFrameScaleFactors = {
+    x: 1 + (scaleFactors.x - 1) * timeRatio,
+    y: 1 + (scaleFactors.y - 1) * timeRatio,
+    z: 1 + (scaleFactors.z - 1) * timeRatio,
+  };
+
+  const perFrameTranslationValues = {
+    x: translationValues.x * timeRatio,
+    y: translationValues.y * timeRatio,
+    z: translationValues.z * timeRatio,
+  };
+
+  return {
+    rotationAngles: perFrameRotationAngles,
+    scaleFactors: perFrameScaleFactors,
+    translationValues: perFrameTranslationValues,
+  };
+}
+
+// Generate rotation, scale, and translation matrix
+function generateTransformationMatrix(matrix) {
+  const { rotationAngles, scaleFactors, translationValues } = matrix;
   const transformationMatrix = mat4.create();
 
-  // 旋转角度转换为弧度
+  // Convert rotation angles to radians
   const angleX = (rotationAngles.x * Math.PI) / 180;
   const angleY = (rotationAngles.y * Math.PI) / 180;
   const angleZ = (rotationAngles.z * Math.PI) / 180;
 
-  // 生成旋转矩阵
+  // Generate rotation matrix
   mat4.rotateZ(transformationMatrix, transformationMatrix, angleZ);
   mat4.rotateY(transformationMatrix, transformationMatrix, angleY);
   mat4.rotateX(transformationMatrix, transformationMatrix, angleX);
 
-  // 缩放
+  // Scale
   mat4.scale(transformationMatrix, transformationMatrix, [
     scaleFactors.x,
     scaleFactors.y,
     scaleFactors.z,
   ]);
 
-  // 平移
+  // Translate
   mat4.translate(transformationMatrix, transformationMatrix, [
     translationValues.x,
     translationValues.y,
@@ -100,7 +106,7 @@ function generateTransformationMatrix(
   return transformationMatrix;
 }
 
-// 生成 [a, b] 范围内均匀分布的随机数
+// Generate a random number uniformly distributed in the range [a, b]
 function getRandomInRange(a, b) {
   return Math.random() * (b - a) + a;
 }

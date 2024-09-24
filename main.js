@@ -11,6 +11,9 @@ import { initSpherePoints } from "./geometry.js";
 import { initGPUComputationRenderer } from "./gpgpu.js";
 import { initParticle } from "./particle.js";
 import { generateTransformationMatrices } from "./transformationMatrix.js";
+import { initGUI } from "./lilGUI.js";
+
+const params = initGUI();
 
 const { scene, camera, renderer } = initScene();
 
@@ -32,25 +35,32 @@ const { gpuCompute, positionVariable, backgroundPositionVariable } =
 const points = initParticle(size);
 scene.add(points);
 
-const clock = new THREE.Clock();
+const startTime = performance.now();
+let elapsedTime = 0;
 const targetFPS = 70; // 目标帧率
 const frameDuration = 1000 / targetFPS; // 每帧的时间（毫秒）
 let lastFrameTime = performance.now();
-clock.start();
 
 function animate() {
   const currentTime = performance.now();
+  const elapsedTime = currentTime - startTime;
   // 计算从上一帧到现在的时间差（毫秒）
   const deltaTime = currentTime - lastFrameTime;
   if (deltaTime >= frameDuration) {
+    params.noiseMatrix.translationValues.y = (elapsedTime / 1000) * 0.08;
     lastFrameTime = currentTime;
 
     const {
       noiseTransformationMatrix,
       positionTransformationMatrix,
       backgroundTransformationMatrix,
-    } = generateTransformationMatrices(clock.getElapsedTime());
-    const rep = new THREE.Vector3(3.0, 3.0, 3.0); // 周期性噪声的 rep 参数
+    } = generateTransformationMatrices(
+      params.backgroundMatrix,
+      params.noiseMatrix,
+      params.positionMatrix,
+      deltaTime
+    );
+    const rep = new THREE.Vector3(params.repX, params.repY, params.repZ); // 周期性噪声的 rep 参数
 
     // 设置 Uniforms
     positionVariable.material.uniforms.noiseTransformMatrix = {
@@ -60,7 +70,7 @@ function animate() {
       value: positionTransformationMatrix,
     };
     positionVariable.material.uniforms.rep = { value: rep };
-    positionVariable.material.uniforms.seed = { value: 159.0 };
+    positionVariable.material.uniforms.seed = { value: params.seed };
     backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
       value: backgroundTransformationMatrix,
     };
