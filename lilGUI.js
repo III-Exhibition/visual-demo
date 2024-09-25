@@ -1,10 +1,20 @@
 import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
+import { BlendFunction } from "postprocessing";
 
 export function initGUI(renderer) {
   const gui = new GUI();
   const params = {
     isPaused: false,
     renderOneFrame: () => {},
+    bloom: {
+      luminanceThreshold: 0.3,
+      luminanceSmoothing: 0.025,
+      intensity: 1.0,
+      mipmapBlur: true,
+      radius: 0.45,
+      opacity: 1.0,
+      blendFunction: BlendFunction.ADD,
+    },
     particleParams: {
       pointSize: 1.0,
       transparent: 0.7,
@@ -69,6 +79,17 @@ export function initGUI(renderer) {
       params.isPaused = value;
     });
   // gui.add(params, 'renderOneFrame').name('Render One Frame > ').listen().disable(!params.isPaused);
+
+  const bloomPara = gui.addFolder("bloom parameters");
+  bloomPara
+    .add(params.bloom, "luminanceThreshold", 0, 1, 0.001)
+    .name("lumiThreshold");
+  bloomPara
+    .add(params.bloom, "luminanceSmoothing", 0, 1, 0.001)
+    .name("lumiSmoothing");
+  bloomPara.add(params.bloom, "intensity", 0, 10, 0.01);
+  bloomPara.add(params.bloom, "radius", 0.0, 1.0, 0.001);
+  bloomPara.add(params.bloom, "opacity", 0, 1, 0.001);
 
   const pointPara = gui.addFolder("point parameters");
   pointPara.add(params.particleParams, "pointSize", 0.1, 10, 0.1);

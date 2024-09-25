@@ -1,4 +1,10 @@
 import * as THREE from "three";
+import {
+  BloomEffect,
+  EffectComposer,
+  EffectPass,
+  RenderPass,
+} from "postprocessing";
 import { initScene } from "./scene.js";
 import {
   initControls,
@@ -39,6 +45,12 @@ const { gpuCompute, positionVariable, backgroundPositionVariable } =
 const points = initParticle(size);
 scene.add(points);
 
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+const bloomPass = new BloomEffect(params.bloom);
+composer.addPass(new EffectPass(camera, bloomPass));
+
 const startTime = performance.now();
 const targetFPS = 70; // 目标帧率
 const frameDuration = 1000 / targetFPS; // 每帧的时间（毫秒）
@@ -51,8 +63,15 @@ function animate() {
     // 计算从上一帧到现在的时间差（毫秒）
     const deltaTime = currentTime - lastFrameTime;
     if (deltaTime >= frameDuration) {
-      params.noiseMatrix.translationValues.y = (elapsedTime / 1000) * 0.08;
       lastFrameTime = currentTime;
+
+      params.noiseMatrix.translationValues.y = (elapsedTime / 1000) * 0.08;
+
+      bloomPass.luminanceMaterial.threshold = params.bloom.luminanceThreshold;
+      bloomPass.luminanceMaterial.smoothing = params.bloom.luminanceSmoothing;
+      bloomPass.intensity = params.bloom.intensity;
+      bloomPass.mipmapBlurPass.radius = params.bloom.radius;
+      bloomPass.blendMode.opacity.value = params.bloom.opacity;
 
       const {
         noiseTransformationMatrix,
@@ -107,7 +126,7 @@ function animate() {
       // 更新 OrbitControls
       controls.update();
       stats.update();
-      renderer.render(scene, camera);
+      composer.render();
     }
   }
   requestAnimationFrame(animate);

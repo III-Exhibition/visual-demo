@@ -90,8 +90,6 @@ export const fragmentShader = `
   varying vec3 vColor; // 接收来自顶点着色器的颜色
 
   void main() {
-      // 伽马校正
-      vec3 gammaCorrectedColor = pow(vColor, vec3(1.0 / 2.2)); 
-      gl_FragColor = vec4(useColor ? gammaCorrectedColor : vec3(1.0), transparent); // 使用传递的颜色
+      gl_FragColor = vec4(useColor ? vColor : vec3(1.0), transparent); // 使用传递的颜色
   }
 `;
