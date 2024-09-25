@@ -17,7 +17,7 @@ export function initGUI(renderer) {
     },
     particleParams: {
       pointSize: 1.0,
-      transparent: 0.7,
+      transparent: 0.4,
       useColor: true,
     },
     noiseParams: {
