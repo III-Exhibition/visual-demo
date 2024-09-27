@@ -19,7 +19,7 @@ export function initGUI(renderer) {
       color_X_minus: { r: 0.8308, g: 0.2747, b: 0.3185 }, // 暗红色
       color_Y_plus: { r: 0.8228, g: 0.0437, b: 0.0742 }, // 深红色
       color_Y_minus: { r: 0.9647, g: 0.2016, b: 0.0409 }, // 鲜艳的橙红色
-      color_Z_plus: { r: 0.5520, g: 0.7305, b: 0.6308 }, // 柔和的青绿色
+      color_Z_plus: { r: 0.552, g: 0.7305, b: 0.6308 }, // 柔和的青绿色
       color_Z_minus: { r: 0.7758, g: 0.5395, b: 0.5906 }, // 柔和的粉红色
     },
     bloom: {
@@ -35,6 +35,7 @@ export function initGUI(renderer) {
       pointSize: 1.0,
       transparent: 0.4,
       useColor: true,
+      colorPattern: "distance",
     },
     noiseParams: {
       seed: Math.floor(Math.random() * 300),
@@ -111,6 +112,7 @@ export function initGUI(renderer) {
   pointPara.add(params.particleParams, "pointSize", 0.1, 10, 0.1);
   pointPara.add(params.particleParams, "transparent", 0, 1, 0.01);
   pointPara.add(params.particleParams, "useColor");
+  pointPara.add(params.particleParams, "colorPattern", ["area", "distance"]);
   pointPara.addColor(params.colorParams, "color_X_plus");
   pointPara.addColor(params.colorParams, "color_X_minus");
   pointPara.addColor(params.colorParams, "color_Y_plus");

@@ -98,6 +98,9 @@ function animate() {
         value: Object.values(params.colorParams).map((color) => new THREE.Vector3(color.r, color.g, color.b)),
       };
       colorVariable.material.uniforms.radius = { value: radius };
+      colorVariable.material.uniforms.colorPattern = {
+        value: params.particleParams.colorPattern === "area" ? 0 : 1,
+      };
       positionVariable.material.uniforms.noiseTransformMatrix = {
         value: noiseTransformationMatrix,
       };

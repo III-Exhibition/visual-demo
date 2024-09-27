@@ -38,6 +38,7 @@ export const positionComputeFragmentShader = `
 export const colorComputeFragmentShader = `
   uniform vec3 colors[6];
   uniform float radius;
+  uniform int colorPattern;
 
   // 函数：根据顶点的空间位置确定其所在的区域
   vec3 getColorByPositionArea(float x, float y, float z) {
@@ -79,15 +80,16 @@ export const colorComputeFragmentShader = `
     // 获取背景点云的位置
     vec4 backgroundPosition = texture(backgroundPosition, uv);
 
-    // 根据背景点云的位置，获取颜色
-    // vec3 color = getColorByPositionArea(backgroundPosition.x, backgroundPosition.y, backgroundPosition.z);
+    vec3 color = vec3(1.0);
     
-    // 计算最大距离和当前距离
-    float maxDistance = radius;
-    float distance = length(backgroundPosition.xyz);
-
-    // 根据距离获取颜色
-    vec3 color = getColorByPositionDistance(distance, maxDistance);
+    if (colorPattern == 0) {
+      color = getColorByPositionArea(backgroundPosition.x, backgroundPosition.y, backgroundPosition.z);
+    } else if (colorPattern == 1) {
+     // 计算最大距离和当前距离
+      float maxDistance = radius;
+      float distance = length(backgroundPosition.xyz);
+      color = getColorByPositionDistance(distance, maxDistance);
+    }
 
     // 设置片元颜色
     gl_FragColor = vec4(color, 1.0);
