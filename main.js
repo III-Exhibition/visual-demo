@@ -2,6 +2,10 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { createNoise3D } from "simplex-noise"; // 从simplex-noise v4导入createNoise3D
 import { GUI } from "lil-gui"; // 引入 lil-gui
+import Stats from "three/examples/jsm/libs/stats.module";
+
+const stats = new Stats();
+document.body.appendChild(stats.dom);
 
 // 创建 3D 噪声函数
 const noise3D = createNoise3D();
@@ -235,6 +239,7 @@ function animate() {
 
   // 更新控件
   controls.update();
+  stats.update();
 
   renderer.render(scene, camera);
 }
