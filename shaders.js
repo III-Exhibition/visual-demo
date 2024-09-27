@@ -36,10 +36,61 @@ export const positionComputeFragmentShader = `
 `;
 
 export const colorComputeFragmentShader = `
+  uniform vec3 colors[6];
+  uniform float radius;
+
+  // 函数：根据顶点的空间位置确定其所在的区域
+  vec3 getColorByPositionArea(float x, float y, float z) {
+    vec3 color_X_plus = colors[0];
+    vec3 color_X_minus = colors[1];
+    vec3 color_Y_plus = colors[2];
+    vec3 color_Y_minus = colors[3];
+    vec3 color_Z_plus = colors[4];
+    vec3 color_Z_minus = colors[5];
+    if (abs(x) >= abs(y) && abs(x) >= abs(z)) {
+      return x >= 0.0 ? color_X_plus : color_X_minus;
+    } else if (abs(y) >= abs(x) && abs(y) >= abs(z)) {
+      return y >= 0.0 ? color_Y_plus : color_Y_minus;
+    } else {
+      return z >= 0.0 ? color_Z_plus : color_Z_minus;
+    }
+  }
+
+  // 函数：根据距离映射颜色
+  vec3 getColorByPositionDistance(float distance, float maxDistance) {
+    vec3 colorStops[6] = colors;
+
+    // 计算距离比例
+    float ratio = distance / maxDistance;
+    int numStops = 6;
+    float scaledRatio = ratio * float(numStops - 1);
+    int lowerIndex = int(floor(scaledRatio));
+    int upperIndex = min(lowerIndex + 1, numStops - 1);
+    float blendFactor = scaledRatio - float(lowerIndex);
+
+    // 混合颜色
+    vec3 color = mix(colorStops[lowerIndex], colorStops[upperIndex], blendFactor);
+    return color;
+  }
+
   void main() {
     vec2 uv = gl_FragCoord.xy / resolution.xy;
-    vec4 color = texture(color, uv);
-    gl_FragColor = color;
+    
+    // 获取背景点云的位置
+    vec4 backgroundPosition = texture(backgroundPosition, uv);
+
+    // 根据背景点云的位置，获取颜色
+    // vec3 color = getColorByPositionArea(backgroundPosition.x, backgroundPosition.y, backgroundPosition.z);
+    
+    // 计算最大距离和当前距离
+    float maxDistance = radius;
+    float distance = length(backgroundPosition.xyz);
+
+    // 根据距离获取颜色
+    vec3 color = getColorByPositionDistance(distance, maxDistance);
+
+    // 设置片元颜色
+    gl_FragColor = vec4(color, 1.0);
   }
 `;
 

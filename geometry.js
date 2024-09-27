@@ -89,6 +89,7 @@ function getColorByPositionArea(x, y, z) {
 // 创建用于颜色渐变的色板
 const colorStops = [
   new THREE.Color(0xEDE7E9),  // 到球心最近的颜色
+  new THREE.Color(0xEB8F99),
   new THREE.Color(0xEA3B4D),
   new THREE.Color(0xFB7C39),
   new THREE.Color(0xC4DED0),

@@ -94,6 +94,10 @@ function animate() {
       );
 
       // 设置 Uniforms
+      colorVariable.material.uniforms.colors = {
+        value: Object.values(params.colorParams).map((color) => new THREE.Vector3(color.r, color.g, color.b)),
+      };
+      colorVariable.material.uniforms.radius = { value: radius };
       positionVariable.material.uniforms.noiseTransformMatrix = {
         value: noiseTransformationMatrix,
       };
@@ -123,8 +127,6 @@ function animate() {
       const backgroundPositionTexture = gpuCompute.getCurrentRenderTarget(
         backgroundPositionVariable
       ).texture;
-
-      
 
       // 更新材质的 Uniform
       points.material.uniforms.positionTexture.value = posTexture;

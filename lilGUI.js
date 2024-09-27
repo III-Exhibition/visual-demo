@@ -6,6 +6,22 @@ export function initGUI(renderer) {
   const params = {
     isPaused: false,
     renderOneFrame: () => {},
+    // colorParams: {
+    //   color_X_plus: { r: 1.0, g: 0.2745, b: 0.0 },   // 鲜艳的橘红色
+    //   color_X_minus: { r: 1.0, g: 0.1961, b: 0.0 },  // 亮丽的红橘色
+    //   color_Y_plus: { r: 1.0, g: 0.3333, b: 0.0 },   // 热情的亮橘色
+    //   color_Y_minus: { r: 1.0, g: 0.1569, b: 0.0 },  // 活力的深橘红
+    //   color_Z_plus: { r: 1.0, g: 0.4, b: 0.0 },      // 明亮的橙红色
+    //   color_Z_minus: { r: 1.0, g: 0.2353, b: 0.0 },  // 生机勃勃的橘色
+    // },
+    colorParams: {
+      color_X_plus: { r: 0.8469, g: 0.7991, b: 0.8148 }, // 柔和的灰紫色
+      color_X_minus: { r: 0.8308, g: 0.2747, b: 0.3185 }, // 暗红色
+      color_Y_plus: { r: 0.8228, g: 0.0437, b: 0.0742 }, // 深红色
+      color_Y_minus: { r: 0.9647, g: 0.2016, b: 0.0409 }, // 鲜艳的橙红色
+      color_Z_plus: { r: 0.5520, g: 0.7305, b: 0.6308 }, // 柔和的青绿色
+      color_Z_minus: { r: 0.7758, g: 0.5395, b: 0.5906 }, // 柔和的粉红色
+    },
     bloom: {
       luminanceThreshold: 0.3,
       luminanceSmoothing: 0.025,
@@ -95,6 +111,12 @@ export function initGUI(renderer) {
   pointPara.add(params.particleParams, "pointSize", 0.1, 10, 0.1);
   pointPara.add(params.particleParams, "transparent", 0, 1, 0.01);
   pointPara.add(params.particleParams, "useColor");
+  pointPara.addColor(params.colorParams, "color_X_plus");
+  pointPara.addColor(params.colorParams, "color_X_minus");
+  pointPara.addColor(params.colorParams, "color_Y_plus");
+  pointPara.addColor(params.colorParams, "color_Y_minus");
+  pointPara.addColor(params.colorParams, "color_Z_plus");
+  pointPara.addColor(params.colorParams, "color_Z_minus");
 
   const noisePara = gui.addFolder("perling noise parameters");
   noisePara.add(params.noiseParams, "seed", 0, 300, 1);
