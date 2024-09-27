@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { createNoise3D } from 'simplex-noise'; // 从simplex-noise v4导入createNoise3D
+import { GUI } from 'lil-gui'; // 引入 lil-gui
 
 // 创建 3D 噪声函数
 const noise3D = createNoise3D();
@@ -8,7 +9,7 @@ const noise3D = createNoise3D();
 // 创建场景、相机和渲染器
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true}); // 保留绘图缓冲区，以便在渲染后获取画布内容
 renderer.setClearColor( 0x000000, 0 );
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -85,6 +86,21 @@ camera.position.z = 150;
 
 // 添加OrbitControls
 const controls = new OrbitControls(camera, renderer.domElement);
+
+
+// 创建 lil-gui 并添加截图功能
+const gui = new GUI();
+const params = {
+    screenshot: () => {
+        const link = document.createElement('a');
+        link.href = renderer.domElement.toDataURL('image/png');
+        const timeString = new Date().toISOString().replace(/[-:.]/g, '');
+        link.download = `screenshot-${timeString}.png`;
+        link.click();
+    }
+};
+
+gui.add(params, 'screenshot').name('Save Screenshot');
 
 // 函数：允许边界范围动态变化，并根据噪声进行扩散
 function updateDynamicRadius() {
