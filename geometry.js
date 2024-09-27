@@ -1,6 +1,7 @@
+import * as THREE from 'three';
 export function initSpherePoints(numParticles, radius) {
   const postions = getSpherePointsPostion(numParticles, radius);
-  const colors = getSpherePointsColor(postions);
+  const colors = getSpherePointsColor(postions, radius);
 
   window.spherePostions = postions;
   window.sphereColors = colors;
@@ -16,7 +17,7 @@ function getSpherePointsPostion(numParticles, radius) {
   return postions;
 }
 
-function getSpherePointsColor(postions) {
+function getSpherePointsColor(postions, radius) {
   // 生成球面上的粒子并为每个粒子赋予不同的颜色
   const numParticles = postions.length / 4;
   const colors = new Float32Array(numParticles * 3);
@@ -24,7 +25,8 @@ function getSpherePointsColor(postions) {
     const [x, y, z] = postions.slice(i * 4, i * 4 + 3); // 获取位置
 
     // 根据位置获取颜色
-    const [r, g, b] = getColorByPosition(x, y, z);
+    const distance = Math.sqrt(x * x + y * y + z * z);
+    const [r, g, b] = getColorByPositionDistance(distance, radius);
     colors[i * 3] = r;
     colors[i * 3 + 1] = g;
     colors[i * 3 + 2] = b;
@@ -72,7 +74,7 @@ const faceColors = {
 };
 
 // 根据顶点的空间位置确定其所在的区域
-function getColorByPosition(x, y, z) {
+function getColorByPositionArea(x, y, z) {
   if (Math.abs(x) >= Math.abs(y) && Math.abs(x) >= Math.abs(z)) {
     return x >= 0 ? faceColors["+X"] : faceColors["-X"];
   } else if (Math.abs(y) >= Math.abs(x) && Math.abs(y) >= Math.abs(z)) {
@@ -80,4 +82,28 @@ function getColorByPosition(x, y, z) {
   } else {
     return z >= 0 ? faceColors["+Z"] : faceColors["-Z"];
   }
+}
+
+
+// 创建用于颜色渐变的色板
+const colorStops = [
+  new THREE.Color(0xEDE7E9),  // 到球心最近的颜色
+  new THREE.Color(0xEA3B4D),
+  new THREE.Color(0xFB7C39),
+  new THREE.Color(0xC4DED0),
+  new THREE.Color(0xE4C2CA),  // 到球心最远的颜色
+];
+
+// 函数：根据距离映射颜色
+function getColorByPositionDistance(distance, maxDistance) {
+  const ratio = distance / maxDistance;
+  const numStops = colorStops.length;
+  const scaledRatio = ratio * (numStops - 1);
+  const lowerIndex = Math.floor(scaledRatio);
+  const upperIndex = Math.min(lowerIndex + 1, numStops - 1);
+  const blendFactor = scaledRatio - lowerIndex;
+
+  const color = new THREE.Color();
+  color.lerpColors(colorStops[lowerIndex], colorStops[upperIndex], blendFactor);
+  return [color.r, color.g, color.b];
 }
