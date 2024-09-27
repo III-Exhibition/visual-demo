@@ -57,8 +57,8 @@ export const vertexShader = `
   uniform vec2 resolution;
   uniform float pointSize;
   attribute float vertexIndex;
-  attribute vec3 color;
-  varying vec3 vColor; // 用于传递颜色到片段着色器
+  attribute vec4 color;
+  varying vec4 vColor; // 用于传递颜色到片段着色器
 
   void main() {
     // 计算 UV 坐标
@@ -68,7 +68,7 @@ export const vertexShader = `
     vec2 uv = vec2(u, v);
 
     // 从 positionTexture 获取位置数据
-    vec4 posData = texture2D(positionTexture, uv);
+    vec4 posData = texture(positionTexture, uv);
     vec3 pos = posData.xyz;
 
     // 变换到视图空间
@@ -87,9 +87,9 @@ export const vertexShader = `
 export const fragmentShader = `
   uniform float transparent;  // 透明度
   uniform bool useColor;      // 是否使用颜色
-  varying vec3 vColor; // 接收来自顶点着色器的颜色
+  varying vec4 vColor; // 接收来自顶点着色器的颜色
 
   void main() {
-      gl_FragColor = vec4(useColor ? vColor : vec3(1.0), transparent); // 使用传递的颜色
+      gl_FragColor = vec4(useColor ? vColor.rgb : vec3(1.0), transparent); // 使用传递的颜色
   }
 `;

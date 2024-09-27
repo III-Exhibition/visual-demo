@@ -20,7 +20,7 @@ export function initParticle(size) {
   // 创建 position 属性（仍需要，因为 THREE.Points 需要它，但值将由着色器覆盖）
   const positions = new Float32Array(numParticles * 3);
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 4));
 
   // 创建材质，使用自定义着色器
   const material = new THREE.ShaderMaterial({

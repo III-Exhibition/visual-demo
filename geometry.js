@@ -20,16 +20,17 @@ function getSpherePointsPostion(numParticles, radius) {
 function getSpherePointsColor(postions, radius) {
   // 生成球面上的粒子并为每个粒子赋予不同的颜色
   const numParticles = postions.length / 4;
-  const colors = new Float32Array(numParticles * 3);
+  const colors = new Float32Array(numParticles * 4);
   for (let i = 0; i < numParticles; i++) {
     const [x, y, z] = postions.slice(i * 4, i * 4 + 3); // 获取位置
 
     // 根据位置获取颜色
     const distance = Math.sqrt(x * x + y * y + z * z);
     const [r, g, b] = getColorByPositionDistance(distance, radius);
-    colors[i * 3] = r;
-    colors[i * 3 + 1] = g;
-    colors[i * 3 + 2] = b;
+    colors[i * 4] = r;
+    colors[i * 4 + 1] = g;
+    colors[i * 4 + 2] = b;
+    colors[i * 3 + 3] = 1.0;
   }
   return colors;
 }
