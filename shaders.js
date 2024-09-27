@@ -1,6 +1,6 @@
 import pnoise3D from "./shaders/classicnoise3D.vert";
 
-export const computeFragmentShader = `
+export const positionComputeFragmentShader = `
   ${pnoise3D} // 包含 Perlin 噪声函数的 GLSL 代码
 
   uniform mat4 noiseTransformMatrix;        // 4x4 变换矩阵用于计算 Noise
@@ -35,6 +35,14 @@ export const computeFragmentShader = `
   }
 `;
 
+export const colorComputeFragmentShader = `
+  void main() {
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    vec4 color = texture(color, uv);
+    gl_FragColor = color;
+  }
+`;
+
 export const backgroundComputeFragmentShader = `
   uniform mat4 backgroundTransformMatrix;  // 背景点云的变换矩阵
 
@@ -54,6 +62,7 @@ export const backgroundComputeFragmentShader = `
 
 export const vertexShader = `
   uniform sampler2D positionTexture;
+  uniform sampler2D colorTexture;
   uniform vec2 resolution;
   uniform float pointSize;
   attribute float vertexIndex;
@@ -71,6 +80,10 @@ export const vertexShader = `
     vec4 posData = texture(positionTexture, uv);
     vec3 pos = posData.xyz;
 
+    // 从 colorTexture 获取颜色数据
+    vColor = texture(colorTexture, uv);
+
+
     // 变换到视图空间
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
 
@@ -79,8 +92,6 @@ export const vertexShader = `
 
     // 设置最终位置
     gl_Position = projectionMatrix * mvPosition;
-
-    vColor = color;
   }
 `;
 

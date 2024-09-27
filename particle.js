@@ -26,6 +26,7 @@ export function initParticle(size) {
   const material = new THREE.ShaderMaterial({
     transparent: true,
     uniforms: {
+      colorTexture: { value: null }, // 颜色纹理
       positionTexture: { value: null }, // 位置纹理
       resolution: { value: new THREE.Vector2(size, size) },
       pointSize: { value: 1.0 },

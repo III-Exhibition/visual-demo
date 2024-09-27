@@ -1,6 +1,7 @@
 import { GPUComputationRenderer } from "three/examples/jsm/misc/GPUComputationRenderer.js";
 import {
-  computeFragmentShader,
+  positionComputeFragmentShader,
+  colorComputeFragmentShader,
   backgroundComputeFragmentShader,
 } from "./shaders.js";
 
@@ -10,10 +11,15 @@ export function initGPUComputationRenderer(size, renderer) {
 
   // 初始化位置数据，每个粒子的位置为球体上的随机点
   const spherePoints = window.spherePostions;
+  const sphereColors = window.sphereColors;
 
   // 创建初始位置纹理
   const initialPosition = gpuCompute.createTexture();
   initialPosition.image.data.set(spherePoints);
+
+  // 创建颜色纹理
+  const initialColor = gpuCompute.createTexture();
+  initialColor.image.data.set(sphereColors);
 
   // 创建背景点云位置的纹理
   const backgroundPosition = gpuCompute.createTexture();
@@ -22,8 +28,15 @@ export function initGPUComputationRenderer(size, renderer) {
   // 添加位置变量并保存引用
   const positionVariable = gpuCompute.addVariable(
     "position",
-    computeFragmentShader,
+    positionComputeFragmentShader,
     initialPosition
+  );
+
+  // 添加颜色变量并保存引用
+  const colorVariable = gpuCompute.addVariable(
+    "color",
+    colorComputeFragmentShader,
+    initialColor
   );
 
   // 创建背景位置的变量，并使用 backgroundComputeFragmentShader 更新它
@@ -34,6 +47,11 @@ export function initGPUComputationRenderer(size, renderer) {
   );
 
   // 设置变量依赖关系，确保 positionVariable 依赖于 backgroundPositionVariable
+  gpuCompute.setVariableDependencies(colorVariable, [
+    colorVariable,
+    positionVariable,
+    backgroundPositionVariable,
+  ]);
   gpuCompute.setVariableDependencies(positionVariable, [
     positionVariable,
     backgroundPositionVariable,
@@ -48,5 +66,10 @@ export function initGPUComputationRenderer(size, renderer) {
     console.error(error);
   }
 
-  return { gpuCompute, positionVariable, backgroundPositionVariable };
+  return {
+    gpuCompute,
+    positionVariable,
+    colorVariable,
+    backgroundPositionVariable,
+  };
 }

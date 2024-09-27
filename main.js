@@ -39,8 +39,12 @@ const radius = 0.7;
 // 初始化球体上的点
 initSpherePoints(size * size, radius);
 
-const { gpuCompute, positionVariable, backgroundPositionVariable } =
-  initGPUComputationRenderer(size, renderer);
+const {
+  gpuCompute,
+  colorVariable,
+  positionVariable,
+  backgroundPositionVariable,
+} = initGPUComputationRenderer(size, renderer);
 
 const points = initParticle(size);
 scene.add(points);
@@ -107,16 +111,24 @@ function animate() {
       // 计算下一帧的位置
       gpuCompute.compute();
 
-      const backgroundPositionTexture = gpuCompute.getCurrentRenderTarget(
-        backgroundPositionVariable
-      ).texture;
+      // 获取计算后的颜色
+      const colorTexture =
+        gpuCompute.getCurrentRenderTarget(colorVariable).texture;
 
       // 获取计算后的纹理
       const posTexture =
         gpuCompute.getCurrentRenderTarget(positionVariable).texture;
 
+      // 获取背景点云的位置纹理
+      const backgroundPositionTexture = gpuCompute.getCurrentRenderTarget(
+        backgroundPositionVariable
+      ).texture;
+
+      
+
       // 更新材质的 Uniform
       points.material.uniforms.positionTexture.value = posTexture;
+      points.material.uniforms.colorTexture.value = colorTexture;
       points.material.uniforms.pointSize.value =
         params.particleParams.pointSize;
       points.material.uniforms.transparent.value =
