@@ -14,6 +14,10 @@ export function initGUI(renderer) {
     //   color_Z_plus: { r: 1.0, g: 0.4, b: 0.0 },      // 明亮的橙红色
     //   color_Z_minus: { r: 1.0, g: 0.2353, b: 0.0 },  // 生机勃勃的橘色
     // },
+    afterImage: {
+      damp: 0.9,
+      enabled: true,
+    },
     colorParams: {
       color_X_plus: { r: 0.8469, g: 0.7991, b: 0.8148 }, // 柔和的灰紫色
       color_X_minus: { r: 0.8308, g: 0.2747, b: 0.3185 }, // 暗红色
@@ -96,6 +100,10 @@ export function initGUI(renderer) {
       params.isPaused = value;
     });
   // gui.add(params, 'renderOneFrame').name('Render One Frame > ').listen().disable(!params.isPaused);
+
+  const afterImageFolder = gui.addFolder("afterImage parameters");
+  afterImageFolder.add(params.afterImage, "damp", 0, 1, 0.001);
+  afterImageFolder.add(params.afterImage, "enabled");
 
   const bloomPara = gui.addFolder("bloom parameters");
   bloomPara

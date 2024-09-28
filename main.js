@@ -5,6 +5,7 @@ import {
   EffectPass,
   RenderPass,
 } from "postprocessing";
+import {AfterimagePass} from "./AfterimagePass";
 import { initScene } from "./scene.js";
 import {
   initControls,
@@ -52,6 +53,8 @@ scene.add(points);
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
+const afterImagePass = new AfterimagePass(params.afterImage.damp);
+composer.addPass(afterImagePass)
 const bloomPass = new BloomEffect(params.bloom);
 composer.addPass(new EffectPass(camera, bloomPass));
 
@@ -71,6 +74,9 @@ function animate() {
 
       params.noiseMatrix.translationValues.y = (elapsedTime / 1000) * 0.08;
 
+      afterImagePass.uniforms[ 'damp' ].value = params.afterImage.damp;
+      afterImagePass.enabled = params.afterImage.enabled;
+      
       bloomPass.luminanceMaterial.threshold = params.bloom.luminanceThreshold;
       bloomPass.luminanceMaterial.smoothing = params.bloom.luminanceSmoothing;
       bloomPass.intensity = params.bloom.intensity;
