@@ -1,11 +1,14 @@
 import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js";
 import { BlendFunction } from "postprocessing";
+import { animate } from "./main.js";
 
 export function initGUI(renderer) {
   const gui = new GUI();
   const params = {
     isPaused: false,
-    renderOneFrame: () => {},
+    renderOneFrame: () => {
+      animate();
+    },
     // colorParams: {
     //   color_X_plus: { r: 1.0, g: 0.2745, b: 0.0 },   // 鲜艳的橘红色
     //   color_X_minus: { r: 1.0, g: 0.1961, b: 0.0 },  // 亮丽的红橘色
@@ -62,7 +65,7 @@ export function initGUI(renderer) {
       scaleFactors: { x: 1.099204, y: 1.123625, z: 1.087077 },
       translationValues: { x: 0, y: 0, z: 0 },
     },
-    saveScreenshot: function () {
+    saveScreenshot: () => {
       // 获取渲染器的画布内容并转换为 data URL
       const imgData = renderer.domElement.toDataURL("image/png");
 
@@ -98,8 +101,17 @@ export function initGUI(renderer) {
     .name("Pause/Resume")
     .onChange((value) => {
       params.isPaused = value;
+      if (!params.isPaused) {
+        animate();
+        renderOneFrameButton.disable();
+      } else {
+        renderOneFrameButton.enable();
+      }
     });
-  // gui.add(params, 'renderOneFrame').name('Render One Frame > ').listen().disable(!params.isPaused);
+  const renderOneFrameButton = gui
+    .add(params, "renderOneFrame")
+    .name("Render One Frame > ")
+    .disable();
 
   const afterImageFolder = gui.addFolder("afterImage parameters");
   afterImageFolder.add(params.afterImage, "damp", 0, 1, 0.001);

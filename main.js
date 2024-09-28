@@ -5,7 +5,7 @@ import {
   EffectPass,
   RenderPass,
 } from "postprocessing";
-import {AfterimagePass} from "./AfterimagePass";
+import { AfterimagePass } from "./AfterimagePass";
 import { initScene } from "./scene.js";
 import {
   initControls,
@@ -23,10 +23,6 @@ import { initGUI } from "./lilGUI.js";
 const { scene, camera, renderer } = initScene();
 
 const params = initGUI(renderer);
-let renderOneFrame = false;
-params.renderOneFrame = () => {
-  renderOneFrame = true;
-};
 
 const controls = initControls(camera, renderer);
 const stats = initStats();
@@ -54,7 +50,7 @@ const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 const afterImagePass = new AfterimagePass(params.afterImage.damp);
-composer.addPass(afterImagePass)
+composer.addPass(afterImagePass);
 const bloomPass = new BloomEffect(params.bloom);
 composer.addPass(new EffectPass(camera, bloomPass));
 
@@ -63,96 +59,97 @@ const targetFPS = 70; // 目标帧率
 const frameDuration = 1000 / targetFPS; // 每帧的时间（毫秒）
 let lastFrameTime = performance.now();
 
-function animate() {
-  if (!params.isPaused || renderOneFrame) {
-    const currentTime = performance.now();
-    const elapsedTime = currentTime - startTime;
-    // 计算从上一帧到现在的时间差（毫秒）
-    const deltaTime = currentTime - lastFrameTime;
-    if (deltaTime >= frameDuration) {
-      lastFrameTime = currentTime;
+export function animate() {
+  const currentTime = performance.now();
+  const elapsedTime = currentTime - startTime;
+  // 计算从上一帧到现在的时间差（毫秒）
+  const deltaTime = currentTime - lastFrameTime;
+  if (deltaTime >= frameDuration) {
+    lastFrameTime = currentTime;
 
-      params.noiseMatrix.translationValues.y = (elapsedTime / 1000) * 0.08;
+    params.noiseMatrix.translationValues.y = (elapsedTime / 1000) * 0.08;
 
-      afterImagePass.uniforms[ 'damp' ].value = params.afterImage.damp;
-      afterImagePass.enabled = params.afterImage.enabled;
-      
-      bloomPass.luminanceMaterial.threshold = params.bloom.luminanceThreshold;
-      bloomPass.luminanceMaterial.smoothing = params.bloom.luminanceSmoothing;
-      bloomPass.intensity = params.bloom.intensity;
-      bloomPass.mipmapBlurPass.radius = params.bloom.radius;
-      bloomPass.blendMode.opacity.value = params.bloom.opacity;
+    afterImagePass.uniforms["damp"].value = params.afterImage.damp;
+    afterImagePass.enabled = params.afterImage.enabled;
 
-      const {
-        noiseTransformationMatrix,
-        positionTransformationMatrix,
-        backgroundTransformationMatrix,
-      } = generateTransformationMatrices(
-        params.backgroundMatrix,
-        params.noiseMatrix,
-        params.positionMatrix,
-        deltaTime
-      );
-      const rep = new THREE.Vector3(
-        params.noiseParams.periodX,
-        params.noiseParams.periodY,
-        params.noiseParams.periodZ
-      );
+    bloomPass.luminanceMaterial.threshold = params.bloom.luminanceThreshold;
+    bloomPass.luminanceMaterial.smoothing = params.bloom.luminanceSmoothing;
+    bloomPass.intensity = params.bloom.intensity;
+    bloomPass.mipmapBlurPass.radius = params.bloom.radius;
+    bloomPass.blendMode.opacity.value = params.bloom.opacity;
 
-      // 设置 Uniforms
-      colorVariable.material.uniforms.colors = {
-        value: Object.values(params.colorParams).map((color) => new THREE.Vector3(color.r, color.g, color.b)),
-      };
-      colorVariable.material.uniforms.radius = { value: radius };
-      colorVariable.material.uniforms.colorPattern = {
-        value: params.particleParams.colorPattern === "area" ? 0 : 1,
-      };
-      positionVariable.material.uniforms.noiseTransformMatrix = {
-        value: noiseTransformationMatrix,
-      };
-      positionVariable.material.uniforms.positionTransformMatrix = {
-        value: positionTransformationMatrix,
-      };
-      positionVariable.material.uniforms.rep = { value: rep };
-      positionVariable.material.uniforms.seed = {
-        value: params.noiseParams.seed,
-      };
-      backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
-        value: backgroundTransformationMatrix,
-      };
+    const {
+      noiseTransformationMatrix,
+      positionTransformationMatrix,
+      backgroundTransformationMatrix,
+    } = generateTransformationMatrices(
+      params.backgroundMatrix,
+      params.noiseMatrix,
+      params.positionMatrix,
+      deltaTime
+    );
+    const rep = new THREE.Vector3(
+      params.noiseParams.periodX,
+      params.noiseParams.periodY,
+      params.noiseParams.periodZ
+    );
 
-      // 计算下一帧的位置
-      gpuCompute.compute();
+    // 设置 Uniforms
+    colorVariable.material.uniforms.colors = {
+      value: Object.values(params.colorParams).map(
+        (color) => new THREE.Vector3(color.r, color.g, color.b)
+      ),
+    };
+    colorVariable.material.uniforms.radius = { value: radius };
+    colorVariable.material.uniforms.colorPattern = {
+      value: params.particleParams.colorPattern === "area" ? 0 : 1,
+    };
+    positionVariable.material.uniforms.noiseTransformMatrix = {
+      value: noiseTransformationMatrix,
+    };
+    positionVariable.material.uniforms.positionTransformMatrix = {
+      value: positionTransformationMatrix,
+    };
+    positionVariable.material.uniforms.rep = { value: rep };
+    positionVariable.material.uniforms.seed = {
+      value: params.noiseParams.seed,
+    };
+    backgroundPositionVariable.material.uniforms.backgroundTransformMatrix = {
+      value: backgroundTransformationMatrix,
+    };
 
-      // 获取计算后的颜色
-      const colorTexture =
-        gpuCompute.getCurrentRenderTarget(colorVariable).texture;
+    // 计算下一帧的位置
+    gpuCompute.compute();
 
-      // 获取计算后的纹理
-      const posTexture =
-        gpuCompute.getCurrentRenderTarget(positionVariable).texture;
+    // 获取计算后的颜色
+    const colorTexture =
+      gpuCompute.getCurrentRenderTarget(colorVariable).texture;
 
-      // 获取背景点云的位置纹理
-      const backgroundPositionTexture = gpuCompute.getCurrentRenderTarget(
-        backgroundPositionVariable
-      ).texture;
+    // 获取计算后的纹理
+    const posTexture =
+      gpuCompute.getCurrentRenderTarget(positionVariable).texture;
 
-      // 更新材质的 Uniform
-      points.material.uniforms.positionTexture.value = posTexture;
-      points.material.uniforms.colorTexture.value = colorTexture;
-      points.material.uniforms.pointSize.value =
-        params.particleParams.pointSize;
-      points.material.uniforms.transparent.value =
-        params.particleParams.transparent;
-      points.material.uniforms.useColor.value = params.particleParams.useColor;
+    // 获取背景点云的位置纹理
+    const backgroundPositionTexture = gpuCompute.getCurrentRenderTarget(
+      backgroundPositionVariable
+    ).texture;
 
-      // 更新 OrbitControls
-      controls.update();
-      stats.update();
-      composer.render();
-    }
+    // 更新材质的 Uniform
+    points.material.uniforms.positionTexture.value = posTexture;
+    points.material.uniforms.colorTexture.value = colorTexture;
+    points.material.uniforms.pointSize.value = params.particleParams.pointSize;
+    points.material.uniforms.transparent.value =
+      params.particleParams.transparent;
+    points.material.uniforms.useColor.value = params.particleParams.useColor;
+
+    // 更新 OrbitControls
+    controls.update();
+    stats.update();
+    composer.render();
   }
-  requestAnimationFrame(animate);
+  if (!params.isPaused) {
+    requestAnimationFrame(animate);
+  }
 }
 
 animate();
