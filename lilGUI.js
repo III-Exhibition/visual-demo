@@ -94,6 +94,26 @@ export function initGUI(renderer) {
         jsonLink.click();
       }, 3000);
     },
+    isRecording: false,
+    startRecording: () => {
+      if (!params.isRecording) {
+        params.isRecording = true;
+        recordedChunks.length = 0; // Clear previous recordings
+        mediaRecorder.start();
+        recordingStatus.status = "Recording...";
+        startRecordingButton.disable();
+        stopRecordingButton.enable();
+      }
+    },
+    stopRecording: () => {
+      if (params.isRecording) {
+        params.isRecording = false;
+        mediaRecorder.stop();
+        recordingStatus.status = "Not Recording";
+        startRecordingButton.enable();
+        stopRecordingButton.disable();
+      }
+    },
   };
 
   gui
@@ -159,6 +179,40 @@ export function initGUI(renderer) {
   );
   // 在 lil-gui 中添加按钮
   gui.add(params, "saveScreenshot").name("Save PNG");
+
+  // Add buttons for recording
+  const startRecordingButton = gui.add(params, "startRecording").name("Start Recording");
+  const stopRecordingButton = gui.add(params, "stopRecording").name("Stop Recording").disable();
+
+  // Add a label to show recording status
+  const recordingStatus = { status: "Not Recording" };
+  gui.add(recordingStatus, "status").name("Recording Status").listen();
+
+  // Create a MediaRecorder instance
+  const stream = renderer.domElement.captureStream();
+  const mediaRecorder = new MediaRecorder(stream);
+  const recordedChunks = [];
+
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data.size > 0) {
+      recordedChunks.push(event.data);
+    }
+  };
+
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, {
+      type: "video/webm",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = url;
+    a.download = "rendered_video.webm";
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   return params;
 }
 
